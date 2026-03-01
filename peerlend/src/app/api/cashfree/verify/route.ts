@@ -55,7 +55,23 @@ export async function POST(req: Request) {
                 { global: { headers: { Authorization: authHeader } } }
             );
 
-            // Execute the deposit using the user's authenticated context so auth.uid() works
+            // 1. Log payment details for audit
+            const { error: logError } = await supabaseClient
+                .from('payment_details')
+                .upsert({
+                    user_id: user_id,
+                    order_id: order_id,
+                    cf_order_id: data.cf_order_id,
+                    amount: amount,
+                    status: data.order_status,
+                    raw_response: data
+                }, { onConflict: 'order_id' });
+
+            if (logError) {
+                console.warn('Payment logging failed (non-critical):', logError);
+            }
+
+            // 2. Execute the deposit using the user's authenticated context so auth.uid() works
             const { data: depositData, error: depositError } = await supabaseClient.rpc('deposit_funds', {
                 amount_to_add: amount
             });

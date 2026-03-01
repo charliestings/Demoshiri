@@ -31,9 +31,10 @@ interface LenderViewProps {
     onShowWallet?: () => void;
     onShowSuccess?: (amount: number, purpose: string) => void;
     isLoading?: boolean;
+    hasPin?: boolean;
 }
 
-export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet, onShowSuccess, isLoading = false }: LenderViewProps) {
+export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet, onShowSuccess, isLoading = false, hasPin = false }: LenderViewProps) {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
 
@@ -318,6 +319,7 @@ export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet,
                                             kycStatus={kycStatus}
                                             onShowWallet={onShowWallet}
                                             onShowSuccess={onShowSuccess}
+                                            hasPin={hasPin}
                                         />
                                     </div>
                                     <LoanDetailsModal
@@ -327,6 +329,7 @@ export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet,
                                         kycStatus={kycStatus}
                                         onShowWallet={onShowWallet}
                                         onShowSuccess={onShowSuccess}
+                                        hasPin={hasPin}
                                     />
                                 </div>
                             </CardContent>

@@ -16,6 +16,7 @@ interface InvestLoanModalProps {
     kycStatus?: string;
     onShowWallet?: () => void;
     onShowSuccess?: (amount: number, purpose: string) => void;
+    hasPin?: boolean;
 }
 
 export function InvestLoanModal({
@@ -24,7 +25,8 @@ export function InvestLoanModal({
     onInvested,
     kycStatus,
     onShowWallet,
-    onShowSuccess
+    onShowSuccess,
+    hasPin
 }: InvestLoanModalProps) {
     const [open, setOpen] = useState(false);
     const [amount, setAmount] = useState("");
@@ -52,12 +54,36 @@ export function InvestLoanModal({
             return;
         }
 
-        // Trigger PIN Modal instead of raw invest
-        setIsPinModalOpen(true);
+        console.log("InvestModal: Initiating investment", { amount, hasPin });
+
+        if (!hasPin) {
+            alert("Please set your 6-digit Transaction PIN in Settings before investing.");
+            onShowSuccess?.(0, "redirect_settings"); // Optional: handle redirect in parent
+            return;
+        }
+
+        // 1. Close Amount Modal first
+        setOpen(false);
+        console.log("InvestModal: Closing amount dialog");
+
+        // 2. Open PIN Modal after a small delay
+        setTimeout(() => {
+            console.log("InvestModal: Opening PIN verification modal");
+            setIsPinModalOpen(true);
+        }, 500); // Increased delay for Edge/Radix stability
     };
 
     const handleActualInvest = async () => {
         const investAmount = parseFloat(amount);
+        console.log("InvestModal: handleActualInvest called", { amount, investAmount });
+
+        if (isNaN(investAmount) || investAmount <= 0) {
+            console.error("InvestModal: Invalid amount detected during transaction", { amount });
+            alert("Error: Investment amount is missing or invalid. Please try again.");
+            setIsPinModalOpen(false);
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -77,9 +103,10 @@ export function InvestLoanModal({
                 return;
             }
 
-            setOpen(false);
+            console.log("InvestModal: Success!", { investAmount });
             onShowSuccess?.(investAmount, loan.purpose);
             setAmount("");
+            setIsPinModalOpen(false);
             onInvested();
             router.refresh();
 

@@ -28,6 +28,7 @@ interface LoanDetailsModalProps {
     kycStatus: string;
     onShowWallet?: () => void;
     onShowSuccess?: (amount: number, purpose: string) => void;
+    hasPin?: boolean;
 }
 
 export function LoanDetailsModal({
@@ -36,7 +37,8 @@ export function LoanDetailsModal({
     onInvested,
     kycStatus,
     onShowWallet,
-    onShowSuccess
+    onShowSuccess,
+    hasPin
 }: LoanDetailsModalProps) {
     const [open, setOpen] = useState(false);
     const progress = Math.round(((loan.funded_amount || 0) / loan.amount) * 100);
@@ -196,6 +198,7 @@ export function LoanDetailsModal({
                             kycStatus={kycStatus}
                             onShowWallet={onShowWallet}
                             onShowSuccess={onShowSuccess}
+                            hasPin={hasPin}
                         />
                     </div>
                     <Button

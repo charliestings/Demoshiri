@@ -52,13 +52,15 @@ export function WalletView({ userId }: WalletViewProps) {
             if (walletError && walletError.code !== 'PGRST116') throw walletError;
             setBalance(wallet?.balance || 0);
 
-            // 1b. Fetch KYC Status
-            const { data: profile } = await supabase
+            // 1b. Fetch KYC Status - resilient fetch
+            const { data: profile, error: profileErr } = await supabase
                 .from("profiles")
                 .select("kyc_status")
                 .eq("id", userId)
                 .single();
+            if (profileErr) console.error("WalletView: KYC fetch error", profileErr);
             setKycStatus(profile?.kyc_status || 'not_started');
+            console.log("WalletView: Data loaded", { balance: wallet?.balance, kycStatus: profile?.kyc_status });
 
             // 2. Fetch Transactions
             const { data: txns, error: txnsError } = await supabase
@@ -91,23 +93,26 @@ export function WalletView({ userId }: WalletViewProps) {
 
         setDepositing(true);
         try {
-            // 1. Create Cashfree Order
+            console.log("WalletView: Creating Cashfree order", { amount, userId });
             const orderResponse = await fetch('/api/cashfree/create-order', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ amount, userId })
             });
             const orderData = await orderResponse.json();
+            console.log("WalletView: Order data received", orderData);
 
-            if (!orderResponse.ok) {
-                throw new Error(orderData.error || 'Failed to create order');
+            if (!orderResponse.ok || !orderData.payment_session_id) {
+                throw new Error(orderData.error || "Failed to create order");
             }
 
             const { payment_session_id, order_id } = orderData;
 
-            // 2. Initialize Cashfree SDK
+            // 2. Load SDK
+            console.log("WalletView: Loading Cashfree SDK");
             const { load } = await import('@cashfreepayments/cashfree-js');
             const cashfree = await load({ mode: 'sandbox' });
+            console.log("WalletView: SDK Loaded, opening checkout");
 
             // 3. Open Checkout Modal
             const checkoutOptions = {

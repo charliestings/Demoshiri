@@ -70,6 +70,7 @@ function DashboardContent() {
     const [lastInvestPurpose, setLastInvestPurpose] = useState("");
     const [isPinModalOpen, setIsPinModalOpen] = useState(false);
     const [loanToRepay, setLoanToRepay] = useState<any>(null);
+    const [hasPin, setHasPin] = useState(false);
 
     const fetchNotificationsCount = useCallback(async () => {
         if (!user) return;
@@ -127,7 +128,6 @@ function DashboardContent() {
             else setPendingKYCUsers(kycData || []);
         }
 
-        // Refresh current user's KYC status to keep UI in sync
         const { data: currentProfile, error: profileError } = await supabase
             .from("profiles")
             .select("kyc_status")
@@ -136,6 +136,14 @@ function DashboardContent() {
 
         if (!profileError && currentProfile) {
             setKycStatus(currentProfile.kyc_status || "none");
+
+            // Fetch pin status separately
+            const { data: pinData } = await supabase
+                .from("profiles")
+                .select("has_pin")
+                .eq("id", user.id)
+                .single();
+            setHasPin(pinData?.has_pin || false);
         }
     }, [user, isAdmin]);
 
@@ -214,15 +222,28 @@ function DashboardContent() {
             }
             setUser(session.user);
 
-            // Fetch profile to get role and admin status
+            // Fetch profile - fetch basic info first to ensure KYC status is loaded even if new columns fail
             let { data: profile, error: profileError } = await supabase
                 .from("profiles")
                 .select("id, full_name, is_admin, kyc_status")
                 .eq("id", session.user.id)
                 .single();
 
-            // If profile doesn't exist, create a default one
-            if (profileError && profileError.code === 'PGRST116') {
+            if (profile) {
+                // Try fetching has_pin separately to be resilient to missing columns
+                const { data: pinData } = await supabase
+                    .from("profiles")
+                    .select("has_pin")
+                    .eq("id", session.user.id)
+                    .single();
+
+                setRole("borrower");
+                setIsAdmin(profile.is_admin || false);
+                setKycStatus(profile.kyc_status || "none");
+                setHasPin(pinData?.has_pin || false);
+                console.log("Dashboard: Profile loaded", { kycStatus: profile.kyc_status, hasPin: pinData?.has_pin });
+            } else if (profileError && profileError.code === 'PGRST116') {
+                console.log("Dashboard: Creating missing profile");
                 const { data: newProfile, error: createError } = await supabase
                     .from("profiles")
                     .insert({
@@ -233,15 +254,13 @@ function DashboardContent() {
                     .select()
                     .single();
 
-                if (!createError) profile = newProfile;
-                else console.error("Error creating profile:", createError);
-            }
-
-            if (profile) {
-                // Since 'role' doesn't exist in the DB, we default to borrower or infer from is_admin
-                setRole("borrower");
-                setIsAdmin(profile.is_admin || false);
-                setKycStatus(profile.kyc_status || "none");
+                if (!createError && newProfile) {
+                    setRole("borrower");
+                    setIsAdmin(newProfile.is_admin || false);
+                    setKycStatus(newProfile.kyc_status || "none");
+                }
+            } else if (profileError) {
+                console.error("Dashboard: Profile fetch error", profileError);
             }
 
             setLoading(false);
@@ -392,7 +411,7 @@ function DashboardContent() {
                                                 onKYCUpdate={handleKYCUpdate}
                                             />
                                         ) : (
-                                            <LenderView loans={loans.filter(l => l.status === 'approved' && l.borrower_id !== user.id).slice(0, 3)} userId={user.id} onInvested={fetchData} kycStatus={kycStatus} onShowWallet={() => setActiveTab("wallet")} />
+                                            <LenderView loans={loans.filter(l => l.status === 'approved' && l.borrower_id !== user.id).slice(0, 3)} userId={user.id} onInvested={fetchData} kycStatus={kycStatus} onShowWallet={() => setActiveTab("wallet")} hasPin={hasPin} />
                                         )}
                                     </div>
                                 </div>
@@ -429,6 +448,7 @@ function DashboardContent() {
                                         setLastInvestPurpose(purpose);
                                         setShowInvestSuccess(true);
                                     }}
+                                    hasPin={hasPin}
                                 />
                             )}
 
@@ -1238,7 +1258,9 @@ function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, o
                                                         if (!confirm(`Are you sure you want to repay this loan? Total amount: ${formatINR(total)}`)) return;
 
                                                         setLoanToRepay(loan);
-                                                        setIsPinModalOpen(true);
+                                                        setTimeout(() => {
+                                                            setIsPinModalOpen(true);
+                                                        }, 300);
                                                     }}
                                                     className="w-full bg-slate-900 border-0 hover:bg-black text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-10"
                                                 >
