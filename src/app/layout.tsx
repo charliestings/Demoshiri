@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk } from "next/font/google";
+import { Space_Grotesk, Inter, Outfit, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -7,9 +7,28 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
 });
 
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+});
+
 export const metadata: Metadata = {
-  title: "PeerLend - Next Gen P2P Lending",
-  description: "Borrow and Invest with confidence on the most advanced P2P platform.",
+  title: "PeerLend - Platinum Edition",
+  description: "Borrow and Invest with complete transparency on a state-of-the-art P2P platform.",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -20,10 +39,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${spaceGrotesk.variable} antialiased bg-background text-foreground min-h-screen`}
+        className={`${spaceGrotesk.variable} ${inter.variable} ${outfit.variable} ${playfair.variable} antialiased bg-background text-foreground min-h-screen font-inter`}
       >
         {children}
       </body>
     </html>
   );
 }
+
+

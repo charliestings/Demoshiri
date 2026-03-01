@@ -31,52 +31,55 @@
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+
+  --font-family-inter: var(--font-inter), system-ui, sans-serif;
+  --font-family-outfit: var(--font-outfit), system-ui, sans-serif;
+  --font-family-space-grotesk: var(--font-space-grotesk), system-ui, sans-serif;
 }
 
 @layer base {
   :root {
-    /* Sunset Warm Theme */
-    --background: 0 0% 100%;
-    --foreground: 240 10% 20%;
+    /* Sunset Warm Palette */
+    --background: 30 60% 98%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 20%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 20%;
+    --popover-foreground: 222 47% 11%;
 
     /* Vibrant Rose/Pink Primary */
     --primary: 340 82% 52%;
     --primary-foreground: 0 0% 100%;
 
-    /* Warm Orange Secondary */
-    --secondary: 25 95% 53%;
+    /* Warm Gold/Orange Secondary */
+    --secondary: 35 92% 50%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --muted: 30 40% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 330 100% 96%;
-    --accent-foreground: 240 10% 20%;
+    --accent: 340 100% 97%;
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 5% 90%;
-    --input: 240 5% 90%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
     --ring: 340 82% 52%;
 
     --radius: 1.5rem;
   }
-}
 
-@layer base {
   * {
-    @apply border-border;
+    border-color: var(--color-border);
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
     background-image:
       radial-gradient(circle at 10% 10%, hsla(25, 100%, 94%, 0.5) 0%, transparent 60%),
       radial-gradient(circle at 90% 90%, hsla(340, 100%, 94%, 0.5) 0%, transparent 60%);
@@ -84,35 +87,90 @@
   }
 }
 
-/* Sunset Glassmorphism - Standard CSS for shadows */
-
 @utility glass {
-  @apply bg-white/60 backdrop-blur-xl border border-white/40 shadow-sm;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 @utility glass-card {
-  @apply bg-white/70 backdrop-blur-2xl border border-white/50 rounded-[2rem] transition-all duration-300;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(48px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 2.5rem;
+  transition: all 500ms ease-out;
+  box-shadow: 0 25px 50px -12px rgba(222, 47, 11, 0.08);
 
   &:hover {
-    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.1);
+    transform: translateY(-8px);
+    border-color: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 40px 80px -15px rgba(222, 47, 11, 0.12);
   }
 }
 
-@utility glass-input {
-  @apply bg-white/50 border border-rose-100 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-rose-400/50 text-indigo-900 placeholder:text-indigo-900/40 backdrop-blur-sm;
+@utility glass-card-dark {
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(32px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 2.5rem;
+  transition: all 500ms;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
 @utility glass-button {
-  @apply bg-white/80 hover:bg-white border border-white/60 rounded-full px-8 py-3 transition-all active:scale-95 duration-200 backdrop-blur-md font-semibold text-rose-600;
-  box-shadow: 0 10px 20px rgba(244, 63, 94, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 9999px;
+  padding: 1rem 2.5rem;
+  transition: all 300ms;
+  backdrop-filter: blur(12px);
+  font-weight: 700;
+  color: #e11d48;
+  box-shadow: 0 20px 25px -5px rgba(136, 19, 55, 0.05);
+
+  &:hover {
+    background: white;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+@utility magnetic-hover {
+  transition: all 300ms;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+@utility sunset-gradient {
+  background: linear-gradient(to right, #f97316, #ec4899);
+}
+
+@utility sunset-button {
+  background: linear-gradient(to right, #f97316, #ec4899);
+  color: white;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: linear-gradient(to right, #ea580c, #db2777);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(236, 72, 153, 0.4);
+  }
 }
 
 @utility neon-text {
-  @apply font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-orange-600 via-rose-600 to-pink-500;
-}
-
-@utility neon-border {
-  @apply border border-rose-200;
-  box-shadow: 0 0 20px rgba(244, 63, 94, 0.15);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  background: linear-gradient(to right, #f97316, #e11d48, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
