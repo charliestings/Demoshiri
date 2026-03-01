@@ -110,6 +110,7 @@ export function WalletView({ userId }: WalletViewProps) {
 
             // 2. Load SDK
             console.log("WalletView: Loading Cashfree SDK");
+            // @ts-ignore
             const { load } = await import('@cashfreepayments/cashfree-js');
             const cashfree = await load({ mode: 'sandbox' });
             console.log("WalletView: SDK Loaded, opening checkout");

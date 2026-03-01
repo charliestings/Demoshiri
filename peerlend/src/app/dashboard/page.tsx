@@ -402,6 +402,8 @@ function DashboardContent() {
                                                     setLastRepayPurpose(purpose);
                                                     setShowRepaySuccess(true);
                                                 }}
+                                                onRepayInitiated={setLoanToRepay}
+                                                onOpenPinModal={setIsPinModalOpen}
                                             />
                                         ) : isAdmin ? (
                                             <AdminView
@@ -429,6 +431,8 @@ function DashboardContent() {
                                         setLastRepayPurpose(purpose);
                                         setShowRepaySuccess(true);
                                     }}
+                                    onRepayInitiated={setLoanToRepay}
+                                    onOpenPinModal={setIsPinModalOpen}
                                 />
                             )}
 
@@ -1109,13 +1113,15 @@ function AdminView({ loans, kycUsers, onUpdate, onKYCUpdate }: {
     );
 }
 
-function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, onShowRepaySuccess }: {
+function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, onShowRepaySuccess, onRepayInitiated, onOpenPinModal }: {
     loans: any[],
     userId: string,
     onLoanCreated: () => void,
     kycStatus: string,
     onShowWallet?: () => void,
-    onShowRepaySuccess: (amount: number, purpose: string) => void
+    onShowRepaySuccess: (amount: number, purpose: string) => void,
+    onRepayInitiated: (loan: any) => void,
+    onOpenPinModal: (isOpen: boolean) => void
 }) {
     const totalBorrowed = loans.reduce((acc, l) => acc + (l.amount || 0), 0);
     const pendingLoansCount = loans.filter(l => l.status === 'pending').length;
@@ -1257,9 +1263,9 @@ function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, o
                                                         const total = loan.amount + (loan.amount * (loan.interest_rate / 100.0));
                                                         if (!confirm(`Are you sure you want to repay this loan? Total amount: ${formatINR(total)}`)) return;
 
-                                                        setLoanToRepay(loan);
+                                                        onRepayInitiated(loan);
                                                         setTimeout(() => {
-                                                            setIsPinModalOpen(true);
+                                                            onOpenPinModal(true);
                                                         }, 300);
                                                     }}
                                                     className="w-full bg-slate-900 border-0 hover:bg-black text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-10"
