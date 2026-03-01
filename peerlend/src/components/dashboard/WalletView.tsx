@@ -39,6 +39,9 @@ export function WalletView({ userId }: WalletViewProps) {
     const [withdrawing, setWithdrawing] = useState(false);
     const [showWithdrawModal, setShowWithdrawModal] = useState(false);
     const [kycStatus, setKycStatus] = useState<string>('not_started');
+    const [totalInvested, setTotalInvested] = useState(0);
+    const [totalBorrowed, setTotalBorrowed] = useState(0);
+    const [totalEarnings, setTotalEarnings] = useState(0);
 
     const fetchWalletData = useCallback(async () => {
         try {
@@ -71,6 +74,61 @@ export function WalletView({ userId }: WalletViewProps) {
 
             if (txnsError) throw txnsError;
             setTransactions(txns || []);
+
+            // 3. Fetch Total Invested
+            const { data: investments, error: investError } = await supabase
+                .from("investments")
+                .select("amount")
+                .eq("investor_id", userId);
+
+            if (!investError && investments) {
+                const total = investments.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+                setTotalInvested(total);
+            }
+
+            // 4. Fetch Total Borrowed (from funded or repaid loans)
+            const { data: borrowedLoans, error: borrowError } = await supabase
+                .from("loans")
+                .select("amount")
+                .eq("borrower_id", userId)
+                .in("status", ["funded", "repaid"]);
+
+            if (!borrowError && borrowedLoans) {
+                const total = borrowedLoans.reduce((sum, loan) => sum + (loan.amount || 0), 0);
+                setTotalBorrowed(total);
+            }
+
+            // 5. Fetch Total Earnings (interest from repayments)
+            // Earnings are tracked in wallet_transactions as 'earning' type
+            const { data: earnings, error: earnError } = await supabase
+                .from("wallet_transactions")
+                .select("amount")
+                .eq("wallet_id", userId)
+                .eq("type", "earning");
+
+            if (!earnError && earnings) {
+                // For 'earning' tx, the amount includes principal + interest. 
+                // However, the RPC process_loan_repayment logs the FULL repayment (principal + interest) as 'earning'.
+                // To get actual profit, we should look at the difference? 
+                // Actually, let's keep it simple: sum of 'earning' amounts minus the principal of tied investments.
+                // For now, we'll sum the profit portion if we can, or just sum 'earning' rows.
+                // The current RPC adds 'earning' with the FULL (principal+interest) amount.
+                // Let's calculate profit = sum(earning) - sum(original investments for those loans).
+
+                let totalProfit = 0;
+                // Query all investments that have been repaid to find cost basis
+                const { data: repaidInv } = await supabase
+                    .from("investments")
+                    .select("amount, loans!inner(status)")
+                    .eq("investor_id", userId)
+                    .eq("loans.status", "repaid");
+
+                const costBasis = repaidInv?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0;
+                const totalReturns = earnings.reduce((sum, tn) => sum + (tn.amount || 0), 0);
+
+                totalProfit = Math.max(0, totalReturns - costBasis);
+                setTotalEarnings(totalProfit);
+            }
 
             // Add Artificial Delay so user can see Skeletons!
             await new Promise(resolve => setTimeout(resolve, 1500));
@@ -366,9 +424,9 @@ export function WalletView({ userId }: WalletViewProps) {
             {/* Quick Actions / Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                    { label: "Total Invested", val: "₹1,24,000", icon: TrendingUp, color: "rose" },
-                    { label: "Total Borrowed", val: "₹0", icon: ArrowDownCircle, color: "orange" },
-                    { label: "Platform Earnings", val: "₹12,400", icon: DollarSign, color: "emerald" },
+                    { label: "Total Invested", val: formatINR(totalInvested), icon: TrendingUp, color: "rose" },
+                    { label: "Total Borrowed", val: formatINR(totalBorrowed), icon: ArrowDownCircle, color: "orange" },
+                    { label: "Profit Earned", val: formatINR(totalEarnings), icon: DollarSign, color: "emerald" },
                 ].map((stat, i) => (
                     <Card key={i} className="rounded-3xl border-slate-100 shadow-sm bg-white overflow-hidden group">
                         <CardContent className="p-6">
