@@ -91,25 +91,76 @@ export function WalletView({ userId }: WalletViewProps) {
 
         setDepositing(true);
         try {
-            const { data, error } = await supabase.rpc('deposit_funds', {
-                amount_to_add: amount
+            // 1. Create Cashfree Order
+            const orderResponse = await fetch('/api/cashfree/create-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount, userId })
+            });
+            const orderData = await orderResponse.json();
+
+            if (!orderResponse.ok) {
+                throw new Error(orderData.error || 'Failed to create order');
+            }
+
+            const { payment_session_id, order_id } = orderData;
+
+            // 2. Initialize Cashfree SDK
+            const { load } = await import('@cashfreepayments/cashfree-js');
+            const cashfree = await load({ mode: 'sandbox' });
+
+            // 3. Open Checkout Modal
+            const checkoutOptions = {
+                paymentSessionId: payment_session_id,
+                redirectTarget: "_modal",
+            };
+
+            cashfree.checkout(checkoutOptions).then((result: any) => {
+                if (result.error) {
+                    console.log("Checkout closed or error:", result.error);
+                    alert("Payment cancelled or failed.");
+                    setDepositing(false);
+                }
+                if (result.paymentDetails) {
+                    // 4. Verify Payment securely on the backend using user's auth JWT
+                    supabase.auth.getSession().then(({ data: { session } }) => {
+                        fetch('/api/cashfree/verify', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${session?.access_token}`
+                            },
+                            body: JSON.stringify({ order_id, user_id: userId })
+                        })
+                            .then(res => res.json())
+                            .then(verifyData => {
+                                if (verifyData.success) {
+                                    setDepositAmount("");
+                                    setShowDepositModal(false);
+                                    fetchWalletData();
+                                    alert("Funds added successfully!");
+                                } else {
+                                    alert("Payment verification failed: " + (verifyData.message || verifyData.error || "Unknown error"));
+                                }
+                            })
+                            .catch(verifyErr => {
+                                console.error("Verification error:", verifyErr);
+                                alert("Error verifying payment.");
+                            })
+                            .finally(() => {
+                                setDepositing(false);
+                            });
+                    });
+                }
             });
 
-            if (error) throw error;
-
-            setDepositAmount("");
-            setShowDepositModal(false);
-            fetchWalletData();
         } catch (error: any) {
             console.error("Deposit error:", error);
-
-            // Check if it's the specific KYC error we added to Supabase
-            if (error?.message?.includes('KYC verification')) {
-                alert("You must complete your KYC verification before you can add funds to your wallet.");
+            if (error?.message?.includes('KYC')) {
+                alert("You must complete your KYC verification before adding funds.");
             } else {
-                alert("Failed to deposit funds: " + (error?.message || "Please make sure your KYC is approved."));
+                alert("Failed to initiate deposit: " + (error?.message || "Unknown error"));
             }
-        } finally {
             setDepositing(false);
         }
     };
@@ -201,10 +252,10 @@ export function WalletView({ userId }: WalletViewProps) {
                         <p className="text-slate-400 text-sm font-medium">Your protected capital on PeerLend.</p>
                     </div>
 
-                    <div className="flex gap-4">
+                    <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto mt-6 md:mt-0">
                         <Dialog open={showDepositModal} onOpenChange={setShowDepositModal}>
                             <DialogTrigger asChild>
-                                <Button className="bg-orange-500 hover:bg-orange-600 text-white rounded-2xl h-16 px-10 font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02]">
+                                <Button className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white rounded-2xl h-16 px-10 font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02]">
                                     <Plus className="mr-2 h-5 w-5" /> Add Funds
                                 </Button>
                             </DialogTrigger>
@@ -261,7 +312,7 @@ export function WalletView({ userId }: WalletViewProps) {
 
                         <Dialog open={showWithdrawModal} onOpenChange={setShowWithdrawModal}>
                             <DialogTrigger asChild>
-                                <Button variant="outline" className="border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-2xl h-16 px-8 font-black uppercase tracking-widest transition-all">
+                                <Button variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-2xl h-16 px-8 font-black uppercase tracking-widest transition-all">
                                     Withdraw
                                 </Button>
                             </DialogTrigger>

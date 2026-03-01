@@ -96,6 +96,16 @@ export function Navbar() {
                     </nav>
 
                     <div className="flex items-center gap-3">
+                        {user && (
+                            <Link href="/dashboard?tab=notifications" className="sm:hidden relative p-2 text-slate-600 hover:text-rose-600 transition-colors">
+                                <Bell className="h-6 w-6" />
+                                {unreadNotifications > 0 && (
+                                    <span className="absolute top-1 right-1 bg-rose-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full ring-2 ring-white animate-pulse">
+                                        {unreadNotifications}
+                                    </span>
+                                )}
+                            </Link>
+                        )}
                         <div className="hidden sm:flex items-center gap-3">
                             {user ? (
                                 <>
@@ -165,12 +175,25 @@ export function Navbar() {
                                 </Link>
                             ))}
                             <div className="pt-6 border-t border-slate-100 flex flex-col gap-4">
-                                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                                    <Button variant="outline" className="w-full rounded-2xl h-14 font-bold border-2">Log in</Button>
-                                </Link>
-                                <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
-                                    <Button className="w-full rounded-2xl h-14 font-bold bg-gradient-to-r from-orange-600 to-rose-600 text-white">Get Started</Button>
-                                </Link>
+                                {user ? (
+                                    <>
+                                        <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                                            <Button className="w-full rounded-2xl h-14 font-bold bg-rose-950 text-white">Go to Dashboard</Button>
+                                        </Link>
+                                        <Button onClick={() => { handleSignOut(); setMobileMenuOpen(false); }} variant="outline" className="w-full rounded-2xl h-14 font-bold border-2">
+                                            Sign Out
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                                            <Button variant="outline" className="w-full rounded-2xl h-14 font-bold border-2">Log in</Button>
+                                        </Link>
+                                        <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
+                                            <Button className="w-full rounded-2xl h-14 font-bold bg-gradient-to-r from-orange-600 to-rose-600 text-white">Get Started</Button>
+                                        </Link>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </motion.div>

@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Loader2, DollarSign, Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { formatINR } from "@/lib/formatters";
-import { TransactionSuccessModal } from "./TransactionSuccessModal";
+import { PinVerificationModal } from "./PinVerificationModal";
 
 interface InvestLoanModalProps {
     loan: any;
@@ -29,9 +29,10 @@ export function InvestLoanModal({
     const [open, setOpen] = useState(false);
     const [amount, setAmount] = useState("");
     const [loading, setLoading] = useState(false);
+    const [isPinModalOpen, setIsPinModalOpen] = useState(false);
     const router = useRouter();
 
-    const handleInvest = async (e: React.FormEvent) => {
+    const handleInvestInitiate = (e: React.FormEvent) => {
         e.preventDefault();
         const investAmount = parseFloat(amount);
 
@@ -51,6 +52,12 @@ export function InvestLoanModal({
             return;
         }
 
+        // Trigger PIN Modal instead of raw invest
+        setIsPinModalOpen(true);
+    };
+
+    const handleActualInvest = async () => {
+        const investAmount = parseFloat(amount);
         setLoading(true);
 
         try {
@@ -67,7 +74,6 @@ export function InvestLoanModal({
 
             if (data && data.success === false) {
                 alert(data.error || "Failed to process investment");
-                setLoading(false);
                 return;
             }
 
@@ -123,7 +129,7 @@ export function InvestLoanModal({
                             </Button>
                         </div>
                     ) : (
-                        <form onSubmit={handleInvest} className="px-8 pb-10 space-y-6">
+                        <form onSubmit={handleInvestInitiate} className="px-8 pb-10 space-y-6">
                             <div className="space-y-4">
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Investment Amount (₹)</label>
@@ -143,11 +149,11 @@ export function InvestLoanModal({
                                     </div>
                                 </div>
 
-                                <div className="flex gap-4 pt-4">
+                                <div className="flex flex-col sm:flex-row gap-4 pt-4">
                                     <Button
                                         type="submit"
                                         disabled={loading}
-                                        className="flex-[2] bg-gradient-to-r from-slate-900 to-black text-white rounded-2xl py-7 font-black uppercase tracking-widest shadow-xl shadow-slate-900/20 transition-all hover:scale-[1.02]"
+                                        className="w-full sm:flex-[2] bg-gradient-to-r from-slate-900 to-black text-white rounded-2xl py-7 font-black uppercase tracking-widest shadow-xl shadow-slate-900/20 transition-all hover:scale-[1.02]"
                                     >
                                         {loading ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : "Confirm Investment"}
                                     </Button>
@@ -155,7 +161,7 @@ export function InvestLoanModal({
                                         variant="outline"
                                         type="button"
                                         onClick={() => setOpen(false)}
-                                        className="flex-1 border-slate-100 text-slate-400 hover:text-slate-900 rounded-2xl py-7 font-black uppercase tracking-widest transition-all font-sans"
+                                        className="w-full sm:flex-1 border-slate-100 text-slate-400 hover:text-slate-900 rounded-2xl py-7 font-black uppercase tracking-widest transition-all font-sans"
                                     >
                                         Cancel
                                     </Button>
@@ -166,6 +172,13 @@ export function InvestLoanModal({
                 </DialogContent>
             </Dialog>
 
+            <PinVerificationModal
+                isOpen={isPinModalOpen}
+                onClose={() => setIsPinModalOpen(false)}
+                onSuccess={handleActualInvest}
+                title="Authorize Investment"
+                description={`Enter your 6-digit transaction PIN to confirm your investment of ${formatINR(parseFloat(amount) || 0)} in "${loan.purpose}".`}
+            />
         </>
     );
 }

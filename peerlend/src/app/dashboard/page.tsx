@@ -14,6 +14,7 @@ import { LenderView } from "@/components/dashboard/LenderView";
 import { WalletView } from "@/components/dashboard/WalletView";
 import { TransactionsView } from "@/components/dashboard/TransactionsView";
 import { TransactionSuccessModal } from "@/components/dashboard/TransactionSuccessModal";
+import { PinVerificationModal } from "@/components/dashboard/PinVerificationModal";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -60,12 +61,15 @@ function DashboardContent() {
     const [investments, setInvestments] = useState<any[]>([]);
     const [pendingKYCUsers, setPendingKYCUsers] = useState<any[]>([]);
     const [unreadNotifications, setUnreadNotifications] = useState(0);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [showRepaySuccess, setShowRepaySuccess] = useState(false);
     const [lastRepayAmount, setLastRepayAmount] = useState(0);
     const [lastRepayPurpose, setLastRepayPurpose] = useState("");
     const [showInvestSuccess, setShowInvestSuccess] = useState(false);
     const [lastInvestAmount, setLastInvestAmount] = useState(0);
     const [lastInvestPurpose, setLastInvestPurpose] = useState("");
+    const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+    const [loanToRepay, setLoanToRepay] = useState<any>(null);
 
     const fetchNotificationsCount = useCallback(async () => {
         if (!user) return;
@@ -281,24 +285,36 @@ function DashboardContent() {
                 isAdmin={isAdmin}
                 userEmail={user?.email}
                 unreadNotifications={unreadNotifications}
+                mobileOpen={mobileSidebarOpen}
+                setMobileOpen={setMobileSidebarOpen}
             />
 
             {/* Main Content */}
-            <main className="flex-1 ml-64 p-8 overflow-hidden h-screen relative bg-[#fffcfc]">
+            <main className="flex-1 ml-0 md:ml-64 p-4 md:p-8 min-h-screen pb-24 md:pb-8 relative bg-[#fffcfc]">
                 {/* Floating Sunset Blobs - Matches Homepage */}
-                <div className="absolute top-[-5%] right-[-5%] w-[600px] h-[600px] bg-orange-200/20 rounded-full blur-[120px] -z-10 animate-pulse" />
-                <div className="absolute bottom-[-5%] left-[-5%] w-[500px] h-[500px] bg-rose-200/30 rounded-full blur-[100px] -z-10" />
+                <div className="absolute top-[-5%] right-[-5%] w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-orange-200/20 rounded-full blur-[80px] md:blur-[120px] -z-10 animate-pulse" />
+                <div className="absolute bottom-[-5%] left-[-5%] w-[250px] md:w-[500px] h-[250px] md:h-[500px] bg-rose-200/30 rounded-full blur-[60px] md:blur-[100px] -z-10" />
 
-                <header className="flex justify-between items-center mb-6 relative z-10">
-                    <div>
-                        <h1 className="text-4xl font-black tracking-tight neon-text uppercase leading-none">
-                            {activeTab === "market" ? "Explore Loans" : activeTab.replace("-", " ")}
-                        </h1>
-                        <p className="text-slate-500 font-medium mt-1">Hello, {user?.email?.split('@')[0] || 'User'}. Managing your {role} portfolio.</p>
+                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-10 w-full">
+                    <div className="flex items-center gap-3">
+                        <button
+                            className="md:hidden p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            onClick={() => setMobileSidebarOpen(true)}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg>
+                        </button>
+                        <div>
+                            <h1 className="text-3xl md:text-4xl font-black tracking-tight neon-text uppercase leading-none truncate max-w-[200px] sm:max-w-[300px] md:max-w-none">
+                                {activeTab === "market" ? "Explore Loans" : activeTab.replace("-", " ")}
+                            </h1>
+                            <p className="text-slate-500 text-sm font-medium mt-1 truncate max-w-[250px] sm:max-w-none">Hello, {user?.email?.split('@')[0] || 'User'}. Managing your {role} portfolio.</p>
+                        </div>
                     </div>
                     {/* Global actions */}
-                    <div className="flex items-center gap-4">
-                        <RequestLoanModal userId={user.id} onLoanCreated={fetchData} kycStatus={kycStatus} />
+                    <div className="flex items-center gap-4 w-full md:w-auto mt-2 md:mt-0">
+                        <div className="w-full md:w-auto">
+                            <RequestLoanModal userId={user.id} onLoanCreated={fetchData} kycStatus={kycStatus} />
+                        </div>
                     </div>
                 </header>
 
@@ -332,7 +348,7 @@ function DashboardContent() {
                     </motion.div>
                 )}
 
-                <div className="relative z-10 overflow-y-auto h-[calc(100vh-160px)] pr-2 scrollbar-hide">
+                <div className="relative z-10 w-full mb-10">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={activeTab}
@@ -458,6 +474,43 @@ function DashboardContent() {
                 amount={lastInvestAmount}
                 description={`Your investment in "${lastInvestPurpose}" has been processed.`}
                 onViewWallet={() => setActiveTab("wallet")}
+            />
+
+            <PinVerificationModal
+                isOpen={isPinModalOpen}
+                onClose={() => {
+                    setIsPinModalOpen(false);
+                    setLoanToRepay(null);
+                }}
+                onSuccess={async () => {
+                    if (!loanToRepay) return;
+
+                    const repaymentAmount = loanToRepay.amount + (loanToRepay.amount * (loanToRepay.interest_rate / 100.0));
+
+                    try {
+                        const { data, error: rpcError } = await supabase.rpc('process_loan_repayment', {
+                            borrower_uid: user.id,
+                            target_loan_id: loanToRepay.id
+                        });
+
+                        if (rpcError) throw new Error(rpcError.message);
+
+                        if (data && data.success === false) {
+                            alert(data.error || "Repayment failed");
+                            return;
+                        }
+
+                        setShowRepaySuccess(true);
+                        setLastRepayAmount(repaymentAmount);
+                        setLastRepayPurpose(loanToRepay.purpose);
+                        fetchData(); // Refresh all data
+                    } catch (err: any) {
+                        console.error("Repayment error:", err);
+                        alert("Repayment failed: " + err.message);
+                    }
+                }}
+                title="Authorize Repayment"
+                description={`Enter your 6-digit transaction PIN to confirm the repayment of ${formatINR(loanToRepay ? (loanToRepay.amount + (loanToRepay.amount * (loanToRepay.interest_rate / 100.0))) : 0)}.`}
             />
         </div>
     );
@@ -1180,31 +1233,12 @@ function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, o
                                                     </div>
                                                 </div>
                                                 <Button
-                                                    onClick={async () => {
-                                                        if (!confirm(`Are you sure you want to repay this loan? Total amount (Principal + Interest): ${formatINR(repaymentAmount)}`)) return;
+                                                    onClick={() => {
+                                                        const total = loan.amount + (loan.amount * (loan.interest_rate / 100.0));
+                                                        if (!confirm(`Are you sure you want to repay this loan? Total amount: ${formatINR(total)}`)) return;
 
-                                                        try {
-                                                            const { data, error: rpcError } = await supabase.rpc('process_loan_repayment', {
-                                                                borrower_uid: userId,
-                                                                target_loan_id: loan.id
-                                                            });
-
-                                                            if (rpcError) {
-                                                                console.error("Repayment RPC Error:", JSON.stringify(rpcError, null, 2));
-                                                                throw new Error(rpcError.message || "Unknown RPC error");
-                                                            }
-
-                                                            if (data && data.success === false) {
-                                                                alert(data.error || "Repayment failed");
-                                                                return;
-                                                            }
-
-                                                            onShowRepaySuccess(repaymentAmount, loan.purpose);
-                                                            onLoanCreated();
-                                                        } catch (err: any) {
-                                                            console.error("Repayment Catch Error:", JSON.stringify(err, null, 2));
-                                                            alert("Repayment failed: " + (err.message || "Unknown error"));
-                                                        }
+                                                        setLoanToRepay(loan);
+                                                        setIsPinModalOpen(true);
                                                     }}
                                                     className="w-full bg-slate-900 border-0 hover:bg-black text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-10"
                                                 >

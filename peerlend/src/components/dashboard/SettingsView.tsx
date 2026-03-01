@@ -31,6 +31,13 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
         selfie: null
     });
 
+    const [pinData, setPinData] = useState({
+        pin: "",
+        confirmPin: "",
+        hasPin: false
+    });
+    const [pinLoading, setPinLoading] = useState(false);
+
     const [formData, setFormData] = useState({
         // Personal
         full_name: "",
@@ -111,6 +118,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                 if (data.credit_score) {
                     setScore(data.credit_score);
                 }
+                setPinData(prev => ({ ...prev, hasPin: data.has_pin || false }));
             } else {
                 setFormData(prev => ({
                     ...prev,
@@ -323,6 +331,40 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
             alert(`Failed to save: ${error.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSetPin = async () => {
+        if (!pinData.pin || pinData.pin.length !== 6) {
+            alert("Please enter a 6-digit PIN.");
+            return;
+        }
+
+        if (pinData.pin !== pinData.confirmPin) {
+            alert("PINs do not match.");
+            return;
+        }
+
+        setPinLoading(true);
+        try {
+            const { data, error } = await supabase.rpc('set_transaction_pin', {
+                new_pin: pinData.pin
+            });
+
+            if (error) throw error;
+
+            if (data?.success) {
+                alert("Transaction PIN set successfully!");
+                setPinData(prev => ({ ...prev, pin: "", confirmPin: "", hasPin: true }));
+                if (onUpdate) onUpdate();
+            } else {
+                alert(data?.error || "Failed to set PIN");
+            }
+        } catch (error: any) {
+            console.error("Error setting PIN:", error);
+            alert(`Error: ${error.message}`);
+        } finally {
+            setPinLoading(false);
         }
     };
 
@@ -716,7 +758,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-3 gap-4 md:col-span-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:col-span-2">
                                 <div className="space-y-2">
                                     <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">City</Label>
                                     <Input
@@ -787,7 +829,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                                         />
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Occupation</Label>
                                         <Input
@@ -1001,6 +1043,82 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                                 </Button>
                             </div>
                         )}
+                    </CardContent>
+                </Card>
+            </motion.div>
+
+            {/* 5. Security & Transaction PIN */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
+                <Card className="border-slate-100 shadow-sm overflow-hidden">
+                    <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
+                                <Lock className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-lg font-bold text-slate-900">Transaction PIN</CardTitle>
+                                <CardDescription>Secure your investments and repayments with a 6-digit PIN.</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-8">
+                        <div className="flex flex-col md:flex-row gap-8 items-center">
+                            <div className="flex-1 space-y-4 w-full">
+                                {pinData.hasPin ? (
+                                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3">
+                                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                        <div>
+                                            <p className="text-sm font-black text-emerald-900">Transaction PIN is Active</p>
+                                            <p className="text-xs font-medium text-emerald-700/80 mt-0.5">Your wallet is now protected. Enter below to change your PIN.</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl flex items-center gap-3">
+                                        <AlertCircle className="h-5 w-5 text-orange-500" />
+                                        <div>
+                                            <p className="text-sm font-black text-orange-900">No Transaction PIN Set</p>
+                                            <p className="text-xs font-medium text-orange-700/80 mt-0.5">Highly recommended to protect your funds.</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">{pinData.hasPin ? "New 6-Digit PIN" : "Set 6-Digit PIN"}</Label>
+                                        <Input
+                                            type="password"
+                                            maxLength={6}
+                                            placeholder="••••••"
+                                            value={pinData.pin}
+                                            onChange={(e) => setPinData({ ...pinData, pin: e.target.value.replace(/\D/g, '') })}
+                                            className="rounded-xl border-slate-200 bg-slate-50/50 text-center font-black tracking-[1em] text-lg"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Confirm PIN</Label>
+                                        <Input
+                                            type="password"
+                                            maxLength={6}
+                                            placeholder="••••••"
+                                            value={pinData.confirmPin}
+                                            onChange={(e) => setPinData({ ...pinData, confirmPin: e.target.value.replace(/\D/g, '') })}
+                                            className="rounded-xl border-slate-200 bg-slate-50/50 text-center font-black tracking-[1em] text-lg"
+                                        />
+                                    </div>
+                                </div>
+                                <Button
+                                    onClick={handleSetPin}
+                                    disabled={pinLoading || pinData.pin.length !== 6 || pinData.pin !== pinData.confirmPin}
+                                    className="w-full bg-slate-900 text-white font-bold rounded-xl h-12 shadow-lg hover:translate-y-[-2px] transition-all uppercase tracking-widest text-[10px]"
+                                >
+                                    {pinLoading ? "Securing..." : pinData.hasPin ? "Update Transaction PIN" : "Enable PIN Protection"}
+                                </Button>
+                            </div>
+                            <div className="hidden lg:block w-48 text-center space-y-2 opacity-40">
+                                <Shield className="h-16 w-16 mx-auto text-slate-400" />
+                                <p className="text-[10px] font-black uppercase tracking-tighter">Double-Layer Security Active</p>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
             </motion.div>
