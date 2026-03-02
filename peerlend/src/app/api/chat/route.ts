@@ -35,28 +35,50 @@ export async function POST(req: Request) {
     try {
         const { message, history } = await req.json();
 
-        if (!process.env.GEMINI_API_KEY) {
+        // 1. Validate API Key
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            console.error("PeerLend AI Error: GEMINI_API_KEY is missing from environment.");
             return NextResponse.json({
-                reply: "I am currently in 'Offline Mode' because the Gemini API Key is missing in the server configuration. Please ask the administrator to add the GEMINI_API_KEY to the .env.local file."
+                reply: "I am currently in 'Offline Mode' because the Gemini API Key is missing. Please add the GEMINI_API_KEY to your .env.local file and restart the server."
             });
         }
 
-        const modelNames = ["gemini-1.5-flash", "gemini-pro"];
+        // 2. Initialize SDK inside the handler (safest for Hot Reloading)
+        const genAI = new GoogleGenerativeAI(apiKey);
+
+        // 3. Define fallback models and versions
+        const modelConfigs = [
+            { name: "gemini-1.5-flash", version: "v1beta" },
+            { name: "gemini-1.5-flash", version: "v1" },
+            { name: "gemini-2.0-flash", version: "v1beta" },
+            { name: "gemini-1.5-pro", version: "v1beta" },
+            { name: "gemini-pro", version: "v1" }
+        ];
+
         let lastError = null;
         let text = "";
 
-        for (const modelName of modelNames) {
+        // 4. Transform history into Gemini format
+        const chatHistory = (history || []).map((m: any) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }],
+        }));
+
+        // 5. Try each configuration until success
+        for (const config of modelConfigs) {
             try {
-                const model = genAI.getGenerativeModel({ model: modelName });
-                const chatHistory = (history || []).map((m: any) => ({
-                    role: m.role === 'assistant' ? 'model' : 'user',
-                    parts: [{ text: m.content }],
-                }));
+                process.stdout.write(`PeerLend AI: Trying ${config.name} (${config.version})...\n`);
+
+                const model = genAI.getGenerativeModel(
+                    { model: config.name },
+                    { apiVersion: config.version } as any
+                );
 
                 const chat = model.startChat({
                     history: [
                         { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
-                        { role: "model", parts: [{ text: "Understood. I am PeerLend AI, ready to assist." }] },
+                        { role: "model", parts: [{ text: "Understood. I am PeerLend AI, your platform assistant." }] },
                         ...chatHistory
                     ],
                 });
@@ -66,11 +88,11 @@ export async function POST(req: Request) {
                 text = response.text();
 
                 if (text) {
-                    console.log(`Gemini AI Success with ${modelName}`);
+                    process.stdout.write(`PeerLend AI Success with ${config.name}\n`);
                     break;
                 }
             } catch (err: any) {
-                console.error(`Attempt with ${modelName} failed:`, err.message);
+                console.error(`PeerLend AI: ${config.name} failed:`, err.message);
                 lastError = err;
             }
         }
