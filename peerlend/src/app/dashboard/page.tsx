@@ -346,178 +346,180 @@ function DashboardContent() {
             />
 
             {/* Main Content */}
-            <main className="flex-1 ml-0 md:ml-64 p-4 md:p-8 min-h-screen pb-24 md:pb-8 relative bg-[#fffcfc]">
-                {/* Floating Sunset Blobs - Matches Homepage */}
-                <div className="absolute top-[-5%] right-[-5%] w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-orange-200/20 rounded-full blur-[80px] md:blur-[120px] -z-10 animate-pulse" />
-                <div className="absolute bottom-[-5%] left-[-5%] w-[250px] md:w-[500px] h-[250px] md:h-[500px] bg-rose-200/30 rounded-full blur-[60px] md:blur-[100px] -z-10" />
+            <main className="flex-1 ml-0 md:ml-64 p-4 md:p-12 lg:p-16 xl:p-20 min-h-screen pb-24 relative bg-[#fffcfc]">
+                <div className="max-w-7xl mx-auto w-full">
+                    {/* Floating Sunset Blobs - Matches Homepage */}
+                    <div className="absolute top-[-5%] right-[-5%] w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-orange-200/20 rounded-full blur-[80px] md:blur-[120px] -z-10 animate-pulse" />
+                    <div className="absolute bottom-[-5%] left-[-5%] w-[250px] md:w-[500px] h-[250px] md:h-[500px] bg-rose-200/30 rounded-full blur-[60px] md:blur-[100px] -z-10" />
 
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-10 w-full">
-                    <div className="flex items-center gap-3">
-                        <button
-                            className="md:hidden p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200"
-                            onClick={() => setMobileSidebarOpen(true)}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg>
-                        </button>
-                        <div>
-                            <h1 className="text-3xl md:text-4xl font-black tracking-tight neon-text uppercase leading-none truncate max-w-[200px] sm:max-w-[300px] md:max-w-none">
-                                {activeTab === "market" ? "Explore Loans" : activeTab.replace("-", " ")}
-                            </h1>
-                            <p className="text-slate-500 text-sm font-medium mt-1 truncate max-w-[250px] sm:max-w-none">Hello, {user?.email?.split('@')[0] || 'User'}. Managing your {role} portfolio.</p>
-                        </div>
-                    </div>
-                    {/* Global actions */}
-                    <div className="flex items-center gap-4 w-full md:w-auto mt-2 md:mt-0">
-                        <div className="w-full md:w-auto">
-                            <RequestLoanModal userId={user.id} onLoanCreated={fetchData} kycStatus={kycStatus} />
-                        </div>
-                    </div>
-                </header>
-
-                {/* KYC Warning Banner */}
-                {kycStatus !== 'approved' && !isAdmin && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mb-8 p-4 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-between relative z-10 shadow-sm"
-                    >
+                    <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-10 w-full">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
-                                <Shield className="h-5 w-5" />
-                            </div>
+                            <button
+                                className="md:hidden p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                onClick={() => setMobileSidebarOpen(true)}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg>
+                            </button>
                             <div>
-                                <p className="text-xs font-black text-orange-900 uppercase tracking-widest">Verification Required</p>
-                                <p className="text-[10px] text-orange-700 font-medium mt-0.5">
-                                    {kycStatus === 'pending'
-                                        ? "Your identity verification is being reviewed. Financial features will unlock once approved."
-                                        : "Complete your KYC verification in Settings to start borrowing or investing capital."}
-                                </p>
+                                <h1 className="text-3xl md:text-4xl font-black tracking-tight neon-text uppercase leading-none truncate max-w-[200px] sm:max-w-[300px] md:max-w-none">
+                                    {activeTab === "market" ? "Explore Loans" : activeTab.replace("-", " ")}
+                                </h1>
+                                <p className="text-slate-500 text-sm font-medium mt-1 truncate max-w-[250px] sm:max-w-none">Hello, {user?.email?.split('@')[0] || 'User'}. Managing your {role} portfolio.</p>
                             </div>
                         </div>
-                        <Button
-                            onClick={() => setActiveTab("settings")}
-                            variant="ghost"
-                            className="text-[10px] font-black uppercase tracking-widest text-orange-600 hover:bg-orange-100 rounded-xl px-4"
-                        >
-                            {kycStatus === 'pending' ? "Check Status" : "Verify Now"}
-                        </Button>
-                    </motion.div>
-                )}
+                        {/* Global actions */}
+                        <div className="flex items-center gap-4 w-full md:w-auto mt-2 md:mt-0">
+                            <div className="w-full md:w-auto">
+                                <RequestLoanModal userId={user.id} onLoanCreated={fetchData} kycStatus={kycStatus} />
+                            </div>
+                        </div>
+                    </header>
 
-                <div className="relative z-10 w-full mb-10">
-                    <AnimatePresence mode="wait">
+                    {/* KYC Warning Banner */}
+                    {kycStatus !== 'approved' && !isAdmin && (
                         <motion.div
-                            key={activeTab}
-                            initial={{ opacity: 0, y: 10 }}
+                            initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.2 }}
-                            className="space-y-6"
+                            className="mb-8 p-4 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-between relative z-10 shadow-sm"
                         >
-                            {/* VIEW LOGIC */}
-                            {activeTab === "overview" && (
-                                <div className="space-y-8">
-                                    <OverviewStats
-                                        mode={isAdmin ? 'lender' : role}
-                                        loans={loans}
-                                        investments={investments}
-                                        kycStatus={kycStatus}
-                                    />
-
-                                    <div>
-                                        <h2 className="text-xl font-bold text-slate-800 mb-4">Recent Activity</h2>
-                                        {/* Reuse Views for simple list, limit 2 */}
-                                        {role === "borrower" && !isAdmin ? (
-                                            <BorrowerView
-                                                loans={loans.filter(l => l.borrower_id === user.id).slice(0, 2)}
-                                                userId={user.id}
-                                                onLoanCreated={fetchData}
-                                                kycStatus={kycStatus}
-                                                onShowWallet={() => setActiveTab("wallet")}
-                                                onShowRepaySuccess={(amt, purpose) => {
-                                                    setLastRepayAmount(amt);
-                                                    setLastRepayPurpose(purpose);
-                                                    setShowRepaySuccess(true);
-                                                }}
-                                                onRepayInitiated={setLoanToRepay}
-                                                onOpenPinModal={setIsPinModalOpen}
-                                                showAlert={showAlert}
-                                            />
-                                        ) : isAdmin ? (
-                                            <AdminView
-                                                loans={loans.filter(l => l.status === 'pending').slice(0, 3)}
-                                                kycUsers={pendingKYCUsers.slice(0, 3)}
-                                                onUpdate={handleLoanStatusUpdate}
-                                                onKYCUpdate={handleKYCUpdate}
-                                            />
-                                        ) : (
-                                            <LenderView loans={loans.filter(l => l.status === 'approved' && l.borrower_id !== user.id).slice(0, 3)} userId={user.id} onInvested={fetchData} kycStatus={kycStatus} onShowWallet={() => setActiveTab("wallet")} hasPin={hasPin} />
-                                        )}
-                                    </div>
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
+                                    <Shield className="h-5 w-5" />
                                 </div>
-                            )}
-
-                            {activeTab === "loans" && (
-                                <BorrowerView
-                                    loans={loans.filter(l => l.borrower_id === user.id)}
-                                    userId={user.id}
-                                    onLoanCreated={fetchData}
-                                    kycStatus={kycStatus}
-                                    onShowWallet={() => setActiveTab("wallet")}
-                                    onShowRepaySuccess={(amt, purpose) => {
-                                        setLastRepayAmount(amt);
-                                        setLastRepayPurpose(purpose);
-                                        setShowRepaySuccess(true);
-                                    }}
-                                    onRepayInitiated={setLoanToRepay}
-                                    onOpenPinModal={setIsPinModalOpen}
-                                    showAlert={showAlert}
-                                />
-                            )}
-
-                            {activeTab === "wallet" && (
-                                <WalletView userId={user.id} />
-                            )}
-
-                            {activeTab === "market" && (
-                                <LenderView
-                                    loans={loans.filter(l => l.status === 'approved' && l.borrower_id !== user.id)}
-                                    userId={user.id}
-                                    onInvested={fetchData}
-                                    kycStatus={kycStatus}
-                                    onShowWallet={() => setActiveTab("wallet")}
-                                    onShowSuccess={(amt, purpose) => {
-                                        setLastInvestAmount(amt);
-                                        setLastInvestPurpose(purpose);
-                                        setShowInvestSuccess(true);
-                                    }}
-                                    hasPin={hasPin}
-                                />
-                            )}
-
-                            {activeTab === "admin" && isAdmin && (
-                                <AdminView
-                                    loans={loans}
-                                    kycUsers={pendingKYCUsers}
-                                    onUpdate={handleLoanStatusUpdate}
-                                    onKYCUpdate={handleKYCUpdate}
-                                />
-                            )}
-
-                            {activeTab === "settings" && (
-                                <SettingsView user={user} onUpdate={fetchData} />
-                            )}
-
-                            {activeTab === "notifications" && user && (
-                                <NotificationsView userId={user.id} />
-                            )}
-
-                            {activeTab === "transactions" && user && (
-                                <TransactionsView userId={user.id} />
-                            )}
-
+                                <div>
+                                    <p className="text-xs font-black text-orange-900 uppercase tracking-widest">Verification Required</p>
+                                    <p className="text-[10px] text-orange-700 font-medium mt-0.5">
+                                        {kycStatus === 'pending'
+                                            ? "Your identity verification is being reviewed. Financial features will unlock once approved."
+                                            : "Complete your KYC verification in Settings to start borrowing or investing capital."}
+                                    </p>
+                                </div>
+                            </div>
+                            <Button
+                                onClick={() => setActiveTab("settings")}
+                                variant="ghost"
+                                className="text-[10px] font-black uppercase tracking-widest text-orange-600 hover:bg-orange-100 rounded-xl px-4"
+                            >
+                                {kycStatus === 'pending' ? "Check Status" : "Verify Now"}
+                            </Button>
                         </motion.div>
-                    </AnimatePresence>
+                    )}
+
+                    <div className="relative z-10 w-full mb-10">
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={activeTab}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.2 }}
+                                className="space-y-6"
+                            >
+                                {/* VIEW LOGIC */}
+                                {activeTab === "overview" && (
+                                    <div className="space-y-8">
+                                        <OverviewStats
+                                            mode={isAdmin ? 'lender' : role}
+                                            loans={loans}
+                                            investments={investments}
+                                            kycStatus={kycStatus}
+                                        />
+
+                                        <div>
+                                            <h2 className="text-xl font-bold text-slate-800 mb-4">Recent Activity</h2>
+                                            {/* Reuse Views for simple list, limit 2 */}
+                                            {role === "borrower" && !isAdmin ? (
+                                                <BorrowerView
+                                                    loans={loans.filter(l => l.borrower_id === user.id).slice(0, 2)}
+                                                    userId={user.id}
+                                                    onLoanCreated={fetchData}
+                                                    kycStatus={kycStatus}
+                                                    onShowWallet={() => setActiveTab("wallet")}
+                                                    onShowRepaySuccess={(amt, purpose) => {
+                                                        setLastRepayAmount(amt);
+                                                        setLastRepayPurpose(purpose);
+                                                        setShowRepaySuccess(true);
+                                                    }}
+                                                    onRepayInitiated={setLoanToRepay}
+                                                    onOpenPinModal={setIsPinModalOpen}
+                                                    showAlert={showAlert}
+                                                />
+                                            ) : isAdmin ? (
+                                                <AdminView
+                                                    loans={loans.filter(l => l.status === 'pending').slice(0, 3)}
+                                                    kycUsers={pendingKYCUsers.slice(0, 3)}
+                                                    onUpdate={handleLoanStatusUpdate}
+                                                    onKYCUpdate={handleKYCUpdate}
+                                                />
+                                            ) : (
+                                                <LenderView loans={loans.filter(l => l.status === 'approved' && l.borrower_id !== user.id).slice(0, 3)} userId={user.id} onInvested={fetchData} kycStatus={kycStatus} onShowWallet={() => setActiveTab("wallet")} hasPin={hasPin} />
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === "loans" && (
+                                    <BorrowerView
+                                        loans={loans.filter(l => l.borrower_id === user.id)}
+                                        userId={user.id}
+                                        onLoanCreated={fetchData}
+                                        kycStatus={kycStatus}
+                                        onShowWallet={() => setActiveTab("wallet")}
+                                        onShowRepaySuccess={(amt, purpose) => {
+                                            setLastRepayAmount(amt);
+                                            setLastRepayPurpose(purpose);
+                                            setShowRepaySuccess(true);
+                                        }}
+                                        onRepayInitiated={setLoanToRepay}
+                                        onOpenPinModal={setIsPinModalOpen}
+                                        showAlert={showAlert}
+                                    />
+                                )}
+
+                                {activeTab === "wallet" && (
+                                    <WalletView userId={user.id} />
+                                )}
+
+                                {activeTab === "market" && (
+                                    <LenderView
+                                        loans={loans.filter(l => l.status === 'approved' && l.borrower_id !== user.id)}
+                                        userId={user.id}
+                                        onInvested={fetchData}
+                                        kycStatus={kycStatus}
+                                        onShowWallet={() => setActiveTab("wallet")}
+                                        onShowSuccess={(amt, purpose) => {
+                                            setLastInvestAmount(amt);
+                                            setLastInvestPurpose(purpose);
+                                            setShowInvestSuccess(true);
+                                        }}
+                                        hasPin={hasPin}
+                                    />
+                                )}
+
+                                {activeTab === "admin" && isAdmin && (
+                                    <AdminView
+                                        loans={loans}
+                                        kycUsers={pendingKYCUsers}
+                                        onUpdate={handleLoanStatusUpdate}
+                                        onKYCUpdate={handleKYCUpdate}
+                                    />
+                                )}
+
+                                {activeTab === "settings" && (
+                                    <SettingsView user={user} onUpdate={fetchData} />
+                                )}
+
+                                {activeTab === "notifications" && user && (
+                                    <NotificationsView userId={user.id} />
+                                )}
+
+                                {activeTab === "transactions" && user && (
+                                    <TransactionsView userId={user.id} />
+                                )}
+
+                            </motion.div>
+                        </AnimatePresence>
+                    </div>
                 </div>
             </main>
 
