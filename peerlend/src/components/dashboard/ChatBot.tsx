@@ -73,7 +73,9 @@ export function ChatBot() {
 
             const data = await response.json();
 
-            if (data.error) throw new Error(data.error);
+            if (!response.ok) {
+                throw new Error(data.details || data.error || "Server error");
+            }
 
             const assistantMsg: Message = {
                 id: (Date.now() + 1).toString(),
@@ -83,12 +85,12 @@ export function ChatBot() {
             };
 
             setMessages(prev => [...prev, assistantMsg]);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Chat Error:", error);
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content: "I'm having trouble connecting right now. Please check your Gemini API key in the environment variables or try again later!",
+                content: `Error: ${error.message || "I'm having trouble connecting right now."} Please check your Gemini API key or try again later!`,
                 timestamp: new Date()
             }]);
         } finally {

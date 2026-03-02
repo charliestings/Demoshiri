@@ -41,36 +41,56 @@ export async function POST(req: Request) {
             });
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const modelNames = ["gemini-1.5-flash", "gemini-pro"];
+        let lastError = null;
+        let text = "";
 
-        // Transform history into Gemini format
-        const chatHistory = (history || []).map((m: any) => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
-        }));
+        for (const modelName of modelNames) {
+            try {
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const chatHistory = (history || []).map((m: any) => ({
+                    role: m.role === 'assistant' ? 'model' : 'user',
+                    parts: [{ text: m.content }],
+                }));
 
-        const chat = model.startChat({
-            history: [
-                {
-                    role: "user",
-                    parts: [{ text: SYSTEM_PROMPT }],
-                },
-                {
-                    role: "model",
-                    parts: [{ text: "Understood. I am PeerLend AI, ready to assist users with the platform rules and features." }],
-                },
-                ...chatHistory
-            ],
-        });
+                const chat = model.startChat({
+                    history: [
+                        { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
+                        { role: "model", parts: [{ text: "Understood. I am PeerLend AI, ready to assist." }] },
+                        ...chatHistory
+                    ],
+                });
 
-        const result = await chat.sendMessage(message);
-        const response = await result.response;
-        const text = response.text();
+                const result = await chat.sendMessage(message);
+                const response = await result.response;
+                text = response.text();
+
+                if (text) {
+                    console.log(`Gemini AI Success with ${modelName}`);
+                    break;
+                }
+            } catch (err: any) {
+                console.error(`Attempt with ${modelName} failed:`, err.message);
+                lastError = err;
+            }
+        }
+
+        if (!text && lastError) {
+            throw lastError;
+        }
 
         return NextResponse.json({ reply: text });
 
     } catch (error: any) {
-        console.error('Gemini API Error:', error);
-        return NextResponse.json({ error: 'Failed to process chat message' }, { status: 500 });
+        console.error('Gemini API Error (Detailed):', {
+            message: error.message,
+            stack: error.stack,
+            status: error.status,
+            name: error.name
+        });
+        return NextResponse.json({
+            error: 'Failed to process chat message',
+            details: error.message
+        }, { status: 500 });
     }
 }
