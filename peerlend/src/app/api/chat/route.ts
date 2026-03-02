@@ -27,61 +27,53 @@ export async function POST(req: Request) {
             return NextResponse.json({ reply: "API Key missing. Please add GEMINI_API_KEY to .env.local" });
         }
 
-        const modelNames = ["gemini-1.5-flash", "gemini-pro"];
+        // 2. Define combinations to try
+        const modelNames = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro", "gemini-2.0-flash-exp"];
+        const apiVersions = ["v1", "v1beta"];
+
         let text = "";
         let lastErrorMsg = "";
 
-        // 2. Try Direct Fetch (More robust against SDK URL issues)
+        // 3. Try Combinations via Direct Fetch
         for (const model of modelNames) {
-            try {
-                process.stdout.write(`PeerLend AI: Trying Fetch for ${model}...\n`);
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            for (const version of apiVersions) {
+                try {
+                    process.stdout.write(`PeerLend AI: Trying ${model} on ${version}...\n`);
+                    const url = `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${apiKey}`;
 
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [
-                            { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
-                            { role: "model", parts: [{ text: "Understood. I am your assistant." }] },
-                            ...(history || []).map((h: any) => ({
-                                role: h.role === 'assistant' ? 'model' : 'user',
-                                parts: [{ text: h.content }]
-                            })),
-                            { role: "user", parts: [{ text: message }] }
-                        ]
-                    })
-                });
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [
+                                { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
+                                { role: "model", parts: [{ text: "Understood. I am PeerLend AI Assistant." }] },
+                                ...(history || []).map((h: any) => ({
+                                    role: h.role === 'assistant' ? 'model' : 'user',
+                                    parts: [{ text: h.content }]
+                                })),
+                                { role: "user", parts: [{ text: message }] }
+                            ]
+                        })
+                    });
 
-                const data = await response.json();
-                if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    text = data.candidates[0].content.parts[0].text;
-                    process.stdout.write(`PeerLend AI: Success with ${model} via Fetch\n`);
-                    break;
-                } else {
-                    lastErrorMsg = data.error?.message || response.statusText || "Unknown Error";
-                    process.stdout.write(`PeerLend AI: Fetch failed for ${model}: ${lastErrorMsg}\n`);
+                    const data = await response.json();
+                    if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                        text = data.candidates[0].content.parts[0].text;
+                        process.stdout.write(`PeerLend AI: SUCCESS with ${model} on ${version}!\n`);
+                        return NextResponse.json({ reply: text });
+                    } else {
+                        lastErrorMsg = data.error?.message || response.statusText || "Unknown Error";
+                        process.stdout.write(`PeerLend AI: FAILED for ${model}/${version}: ${lastErrorMsg}\n`);
+                    }
+                } catch (err: any) {
+                    lastErrorMsg = err.message;
                 }
-            } catch (err: any) {
-                lastErrorMsg = err.message;
             }
         }
 
-        // 3. Last Fallback: Try SDK (Standard)
-        if (!text) {
-            try {
-                process.stdout.write(`PeerLend AI: Trying SDK Fallback...\n`);
-                const genAI = new GoogleGenerativeAI(apiKey);
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-                const result = await model.generateContent(message);
-                text = result.response.text();
-            } catch (sdkErr: any) {
-                process.stdout.write(`PeerLend AI: SDK Fallback also failed: ${sdkErr.message}\n`);
-                throw new Error(lastErrorMsg || sdkErr.message);
-            }
-        }
-
-        return NextResponse.json({ reply: text });
+        // 4. If all fail, return the last error
+        throw new Error(lastErrorMsg || "No models responded successfully");
 
     } catch (error: any) {
         console.error('PeerLend AI Final Error:', error.message);
