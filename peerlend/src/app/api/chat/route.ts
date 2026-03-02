@@ -27,9 +27,9 @@ export async function POST(req: Request) {
             return NextResponse.json({ reply: "API Key missing. Please add GEMINI_API_KEY to .env.local" });
         }
 
-        // 2. Define combinations to try
-        const modelNames = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro", "gemini-2.0-flash-exp"];
-        const apiVersions = ["v1", "v1beta"];
+        // 2. Define combinations to try (Based on verified list-models results)
+        const modelNames = ["gemini-flash-latest", "gemini-2.0-flash", "gemini-pro-latest", "gemini-1.5-flash"];
+        const apiVersions = ["v1beta", "v1"];
 
         let text = "";
         let lastErrorMsg = "";
