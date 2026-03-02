@@ -1185,7 +1185,7 @@ function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, o
     onShowRepaySuccess: (amount: number, purpose: string) => void,
     onRepayInitiated: (loan: any) => void,
     onOpenPinModal: (isOpen: boolean) => void,
-    showAlert: (title: string, message: string, type: AlertType) => void
+    showAlert: (title: string, message: string, type: AlertType, onConfirm?: () => void) => void
 }) {
     const totalBorrowed = loans.reduce((acc, l) => acc + (l.amount || 0), 0);
     const pendingLoansCount = loans.filter(l => l.status === 'pending').length;
