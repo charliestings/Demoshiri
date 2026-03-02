@@ -8,6 +8,7 @@ import { Loader2, DollarSign, Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { formatINR } from "@/lib/formatters";
 import { PinVerificationModal } from "./PinVerificationModal";
+import { AlertModal, AlertType } from "./AlertModal";
 
 interface InvestLoanModalProps {
     loan: any;
@@ -32,32 +33,47 @@ export function InvestLoanModal({
     const [amount, setAmount] = useState("");
     const [loading, setLoading] = useState(false);
     const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        open: boolean;
+        title: string;
+        message: string;
+        type: AlertType;
+    }>({
+        open: false,
+        title: "",
+        message: "",
+        type: "info"
+    });
     const router = useRouter();
+
+    const showAlert = (title: string, message: string, type: AlertType = "info") => {
+        setAlertConfig({ open: true, title, message, type });
+    };
 
     const handleInvestInitiate = (e: React.FormEvent) => {
         e.preventDefault();
         const investAmount = parseFloat(amount);
 
         if (isNaN(investAmount) || investAmount <= 0) {
-            alert("Please enter a valid amount");
+            showAlert("Invalid Amount", "Please enter a valid amount to invest.", "warning");
             return;
         }
 
         if (kycStatus !== 'approved') {
-            alert("You must have an approved KYC status to invest.");
+            showAlert("KYC Required", "You must have an approved KYC status to invest in opportunities.", "warning");
             return;
         }
 
         const remainingNeeded = loan.amount - (loan.funded_amount || 0);
         if (investAmount > remainingNeeded) {
-            alert(`Amount exceeds remaining funds needed (${formatINR(remainingNeeded)})`);
+            showAlert("Limit Exceeded", `The investment amount exceeds the remaining funds needed (${formatINR(remainingNeeded)}).`, "warning");
             return;
         }
 
         console.log("InvestModal: Initiating investment", { amount, hasPin });
 
         if (!hasPin) {
-            alert("Please set your 6-digit Transaction PIN in Settings before investing.");
+            showAlert("PIN Missing", "Please set your 6-digit Transaction PIN in Settings before investing.", "warning");
             onShowSuccess?.(0, "redirect_settings"); // Optional: handle redirect in parent
             return;
         }
@@ -79,7 +95,7 @@ export function InvestLoanModal({
 
         if (isNaN(investAmount) || investAmount <= 0) {
             console.error("InvestModal: Invalid amount detected during transaction", { amount });
-            alert("Error: Investment amount is missing or invalid. Please try again.");
+            showAlert("Investment Error", "Investment amount is missing or invalid. Please try again.", "error");
             setIsPinModalOpen(false);
             return;
         }
@@ -99,7 +115,7 @@ export function InvestLoanModal({
             }
 
             if (data && data.success === false) {
-                alert(data.error || "Failed to process investment");
+                showAlert("Investment Failed", data.error || "We could not process your investment. Please try again later.", "error");
                 return;
             }
 
@@ -112,7 +128,7 @@ export function InvestLoanModal({
 
         } catch (error: any) {
             console.error("Error investing:", error);
-            alert("Failed to process investment: " + (error.message || "Unknown error"));
+            showAlert("System Error", "Failed to process investment: " + (error.message || "Unknown error"), "error");
         } finally {
             setLoading(false);
         }
@@ -205,6 +221,14 @@ export function InvestLoanModal({
                 onSuccess={handleActualInvest}
                 title="Authorize Investment"
                 description={`Enter your 6-digit transaction PIN to confirm your investment of ${formatINR(parseFloat(amount) || 0)} in "${loan.purpose}".`}
+            />
+
+            <AlertModal
+                isOpen={alertConfig.open}
+                onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
             />
         </>
     );

@@ -13,6 +13,7 @@ import { motion } from "framer-motion";
 import { CreditScoreGauge } from "./CreditScoreGauge";
 import { KYCCameraCapture } from "./KYCCameraCapture";
 import { compressImage } from "@/lib/imageUtils";
+import { AlertModal, AlertType } from "./AlertModal";
 
 interface SettingsViewProps {
     user: any;
@@ -37,6 +38,22 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
         hasPin: false
     });
     const [pinLoading, setPinLoading] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        open: boolean;
+        title: string;
+        message: string;
+        type: AlertType;
+        onConfirm?: () => void;
+    }>({
+        open: false,
+        title: "",
+        message: "",
+        type: "info"
+    });
+
+    const showAlert = (title: string, message: string, type: AlertType = "info", onConfirm?: () => void) => {
+        setAlertConfig({ open: true, title, message, type, onConfirm });
+    };
 
     const [formData, setFormData] = useState({
         // Personal
@@ -221,59 +238,59 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
 
             if (dbError) throw dbError;
 
-            alert("Profile image updated successfully!");
+            showAlert("Success", "Profile image updated successfully!", "success");
         } catch (error: any) {
             console.error('Error uploading image:', error);
-            alert(`Error uploading image: ${error.message}`);
+            showAlert("Upload Failed", `Error uploading image: ${error.message}`, "error");
         } finally {
             setLoading(false);
         }
     };
 
     const handleRemoveImage = async () => {
-        if (!confirm("Are you sure you want to remove your profile photo?")) return;
+        showAlert("Confirm Removal", "Are you sure you want to remove your profile photo?", "confirm", async () => {
+            setLoading(true);
+            try {
+                // 1. Update Profile in DB (set to null)
+                const { error: dbError } = await supabase
+                    .from("profiles")
+                    .update({
+                        profile_image: null,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq("id", user.id);
 
-        setLoading(true);
-        try {
-            // 1. Update Profile in DB (set to null)
-            const { error: dbError } = await supabase
-                .from("profiles")
-                .update({
-                    profile_image: null,
-                    updated_at: new Date().toISOString()
-                })
-                .eq("id", user.id);
+                if (dbError) throw dbError;
 
-            if (dbError) throw dbError;
+                // 2. Try to clean up Storage if possible
+                // We need to find the file extension or try common ones
+                // Since we know the naming convention is `${user.id}/profile.${ext}`
+                // We'll try to extract the extension from the current URL if it exists
+                const currentUrl = formData.profile_image;
+                if (currentUrl && currentUrl.includes(user.id)) {
+                    try {
+                        const urlParts = currentUrl.split('?')[0].split('.');
+                        const ext = urlParts[urlParts.length - 1];
+                        const filePath = `${user.id}/profile.${ext}`;
 
-            // 2. Try to clean up Storage if possible
-            // We need to find the file extension or try common ones
-            // Since we know the naming convention is `${user.id}/profile.${ext}`
-            // We'll try to extract the extension from the current URL if it exists
-            const currentUrl = formData.profile_image;
-            if (currentUrl && currentUrl.includes(user.id)) {
-                try {
-                    const urlParts = currentUrl.split('?')[0].split('.');
-                    const ext = urlParts[urlParts.length - 1];
-                    const filePath = `${user.id}/profile.${ext}`;
-
-                    await supabase.storage
-                        .from('avatars')
-                        .remove([filePath]);
-                } catch (storageErr) {
-                    console.warn("Storage cleanup failed (non-critical):", storageErr);
+                        await supabase.storage
+                            .from('avatars')
+                            .remove([filePath]);
+                    } catch (storageErr) {
+                        console.warn("Storage cleanup failed (non-critical):", storageErr);
+                    }
                 }
-            }
 
-            // 3. Update local state
-            setFormData(prev => ({ ...prev, profile_image: "" }));
-            alert("Profile photo removed.");
-        } catch (error: any) {
-            console.error("Error removing photo:", error);
-            alert(`Failed to remove photo: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
+                // 3. Update local state
+                setFormData(prev => ({ ...prev, profile_image: "" }));
+                showAlert("Photo Removed", "Your profile photo has been removed.", "success");
+            } catch (error: any) {
+                console.error("Error removing photo:", error);
+                showAlert("Error", `Failed to remove photo: ${error.message}`, "error");
+            } finally {
+                setLoading(false);
+            }
+        }); // End of onConfirm
     };
     const handleSave = async () => {
         setLoading(true);
@@ -308,27 +325,27 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                 console.error("Update failed:", error);
                 if (error.code === '23505') {
                     if (error.message.includes('pan_number')) {
-                        alert("Identity Error: This PAN number is already linked to another account.");
+                        showAlert("Identity Conflict", "This PAN number is already linked to another account.", "error");
                     } else if (error.message.includes('aadhar_number')) {
-                        alert("Identity Error: This Aadhar number is already linked to another account.");
+                        showAlert("Identity Conflict", "This Aadhar number is already linked to another account.", "error");
                     } else if (error.message.includes('phone')) {
-                        alert("This phone number is already in use.");
+                        showAlert("Phone Conflict", "This phone number is already in use.", "error");
                     } else {
-                        alert("A conflict occurred: One of your unique identifiers is already in use.");
+                        showAlert("Conflict", "One of your unique identifiers is already in use by another account.", "error");
                     }
                     setLoading(false);
                     return;
                 }
                 if (error.code === '42501') {
-                    alert("Permission denied! RLS Policy issue.");
+                    showAlert("Access Denied", "You don't have permission to perform this update (RLS Policy).", "error");
                 }
                 throw error;
             }
 
-            alert("Profile updated successfully!");
+            showAlert("Profile Updated", "Your profile details have been saved successfully!", "success");
         } catch (error: any) {
             console.error("Error updating profile:", error);
-            alert(`Failed to save: ${error.message || 'Unknown error'}`);
+            showAlert("Save Failed", `We couldn't save your profile changes: ${error.message || 'Unknown error'}`, "error");
         } finally {
             setLoading(false);
         }
@@ -336,12 +353,12 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
 
     const handleSetPin = async () => {
         if (!pinData.pin || pinData.pin.length !== 6) {
-            alert("Please enter a 6-digit PIN.");
+            showAlert("Invalid PIN", "Please enter a strong 6-digit PIN for transactions.", "warning");
             return;
         }
 
         if (pinData.pin !== pinData.confirmPin) {
-            alert("PINs do not match.");
+            showAlert("Mismatch", "PINs do not match. Please re-enter carefully.", "warning");
             return;
         }
 
@@ -354,15 +371,15 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
             if (error) throw error;
 
             if (data?.success) {
-                alert("Transaction PIN set successfully!");
+                showAlert("Success", "Transaction PIN set successfully!", "success");
                 setPinData(prev => ({ ...prev, pin: "", confirmPin: "", hasPin: true }));
                 if (onUpdate) onUpdate();
             } else {
-                alert(data?.error || "Failed to set PIN");
+                showAlert("Error", data?.error || "Failed to set PIN", "error");
             }
         } catch (error: any) {
             console.error("Error setting PIN:", error);
-            alert(`Error: ${error.message}`);
+            showAlert("System Error", `Failed to set Transaction PIN: ${error.message}`, "error");
         } finally {
             setPinLoading(false);
         }
@@ -411,7 +428,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
     const handleSubmitKYC = async () => {
         // Validation
         if (!kycFiles.id_front || !kycFiles.id_back || !kycFiles.pan_card || (!kycFiles.selfie && !capturedSelfie)) {
-            alert("Please upload/capture all 4 documents to submit for verification.");
+            showAlert("Documents Required", "Please upload or capture all 4 required documents to submit for verification.", "warning");
             return;
         }
 
@@ -467,7 +484,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                     .maybeSingle();
 
                 if (duplicateUser) {
-                    alert(`Security Alert: The document you uploaded for ${key.replace('_', ' ')} has already been used by another account. Please upload your own original documents.`);
+                    showAlert("Security Conflict", `The document you uploaded for ${key.replace('_', ' ')} has already been used by another account. Please upload your own original documents for security reasons.`, "error");
                     setKycUploading(false);
                     return;
                 }
@@ -525,17 +542,17 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
             }));
 
             if (onUpdate) onUpdate();
-            alert(`KYC submitted! AI Match Score: ${capturedSelfie?.score ?? (kycFiles.selfie ? 'Manual Verify' : '0')}%`);
+            showAlert("KYC Submitted", `Your identity documents have been submitted for review! AI Match Score: ${capturedSelfie?.score ?? (kycFiles.selfie ? 'Manual Verify' : '0')}%`, "success");
         } catch (error: any) {
             console.error("KYC submission error:", error);
-            alert(`Failed to submit KYC: ${error.message}`);
+            showAlert("Submission Failed", `We could not process your KYC submission: ${error.message}`, "error");
         } finally {
             setKycUploading(false);
         }
     };
 
     const handleResetKYC = async () => {
-        if (confirm("Are you sure you want to reset your KYC? You will need to re-upload all documents. This is useful if you made a mistake or your verification failed.")) {
+        showAlert("Confirm KYC Reset", "Are you sure you want to reset your KYC? You will need to re-upload all documents. This is useful if you made a mistake or your verification failed.", "confirm", async () => {
             setLoading(true);
             try {
                 const { error: resetErr } = await supabase
@@ -565,42 +582,40 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                 setIdCardPreviewUrl(null);
 
                 if (onUpdate) onUpdate();
-                alert("KYC has been reset. You can now re-upload your documents.");
+                showAlert("KYC Reset", "Your KYC has been reset. You can now re-upload your documents.", "success");
             } catch (err: any) {
                 console.error("KYC reset error:", err);
-                alert(`Failed to reset KYC: ${err.message}`);
+                showAlert("Reset Failed", `Failed to reset KYC: ${err.message}`, "error");
             } finally {
                 setLoading(false);
             }
-        }
+        }); // End of onConfirm
     };
 
     const handleDeleteAccount = async () => {
-        if (!confirm("Are you ABSOLUTELY sure you want to delete your account? This action cannot be undone and will permanently erase all your data.")) {
-            return;
-        }
+        showAlert("Danger Zone", "Are you ABSOLUTELY sure you want to delete your account? This action cannot be undone and will permanently erase all your data.", "confirm", async () => {
+            setLoading(true);
+            try {
+                // Attempt to delete via Secure RPC
+                const { error } = await supabase.rpc('delete_user_account');
 
-        setLoading(true);
-        try {
-            // Attempt to delete via Secure RPC
-            const { error } = await supabase.rpc('delete_user_account');
+                if (error) {
+                    console.error("Deletion failed:", error);
+                    showAlert("Deletion error", `Cannot delete account: ${error.message}`, "error");
+                    return;
+                }
 
-            if (error) {
-                console.error("Deletion failed:", error);
-                alert(`Cannot delete account: ${error.message}`);
-                return;
+                // If we succeed, sign out and redirect
+                await supabase.auth.signOut();
+                window.location.href = "/";
+
+            } catch (error: any) {
+                console.error("Fatal deletion error:", error);
+                showAlert("Fatal Error", "An unexpected error occurred while trying to delete your account.", "error");
+            } finally {
+                setLoading(false);
             }
-
-            // If we succeed, sign out and redirect
-            await supabase.auth.signOut();
-            window.location.href = "/";
-
-        } catch (error: any) {
-            console.error("Fatal deletion error:", error);
-            alert("An unexpected error occurred while trying to delete your account.");
-        } finally {
-            setLoading(false);
-        }
+        }); // End of onConfirm
     };
 
     if (!user) {
@@ -970,6 +985,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                                                     <KYCCameraCapture
                                                         onCapture={handleSelfieCapture}
                                                         idCardImage={idCardPreviewUrl}
+                                                        showAlert={showAlert}
                                                     />
                                                     {capturedSelfie && (
                                                         <div className={`mt-4 flex items-center justify-between p-3 rounded-xl border ${capturedSelfie.score > 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
@@ -1175,6 +1191,15 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                     </Button>
                 </div>
             </motion.div>
-        </div >
+
+            <AlertModal
+                isOpen={alertConfig.open}
+                onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
+                onConfirm={alertConfig.onConfirm}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+            />
+        </div>
     );
 }

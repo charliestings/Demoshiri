@@ -23,6 +23,7 @@ import { formatINR } from "@/lib/formatters";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AlertModal, AlertType } from "./AlertModal";
 
 interface WalletViewProps {
     userId: string;
@@ -42,6 +43,22 @@ export function WalletView({ userId }: WalletViewProps) {
     const [totalInvested, setTotalInvested] = useState(0);
     const [totalBorrowed, setTotalBorrowed] = useState(0);
     const [totalEarnings, setTotalEarnings] = useState(0);
+    const [alertConfig, setAlertConfig] = useState<{
+        open: boolean;
+        title: string;
+        message: string;
+        type: AlertType;
+        onConfirm?: () => void;
+    }>({
+        open: false,
+        title: "",
+        message: "",
+        type: "info"
+    });
+
+    const showAlert = (title: string, message: string, type: AlertType = "info", onConfirm?: () => void) => {
+        setAlertConfig({ open: true, title, message, type, onConfirm });
+    };
 
     const fetchWalletData = useCallback(async () => {
         try {
@@ -182,7 +199,7 @@ export function WalletView({ userId }: WalletViewProps) {
             cashfree.checkout(checkoutOptions).then((result: any) => {
                 if (result.error) {
                     console.log("Checkout closed or error:", result.error);
-                    alert("Payment cancelled or failed.");
+                    showAlert("Payment Failed", "Payment was cancelled or failed to process.", "error");
                     setDepositing(false);
                 }
                 if (result.paymentDetails) {
@@ -202,14 +219,14 @@ export function WalletView({ userId }: WalletViewProps) {
                                     setDepositAmount("");
                                     setShowDepositModal(false);
                                     fetchWalletData();
-                                    alert("Funds added successfully!");
+                                    showAlert("Deposit Success", "Funds have been added to your wallet successfully!", "success");
                                 } else {
-                                    alert("Payment verification failed: " + (verifyData.message || verifyData.error || "Unknown error"));
+                                    showAlert("Verification Failed", verifyData.message || verifyData.error || "Payment verification failed.", "error");
                                 }
                             })
                             .catch(verifyErr => {
                                 console.error("Verification error:", verifyErr);
-                                alert("Error verifying payment.");
+                                showAlert("Error", "There was an error verifying your payment. Please contact support.", "error");
                             })
                             .finally(() => {
                                 setDepositing(false);
@@ -221,9 +238,9 @@ export function WalletView({ userId }: WalletViewProps) {
         } catch (error: any) {
             console.error("Deposit error:", error);
             if (error?.message?.includes('KYC')) {
-                alert("You must complete your KYC verification before adding funds.");
+                showAlert("KYC Required", "You must complete your KYC verification before adding funds to your wallet.", "warning");
             } else {
-                alert("Failed to initiate deposit: " + (error?.message || "Unknown error"));
+                showAlert("System Error", error?.message || "Failed to initiate deposit. Please try again.", "error");
             }
             setDepositing(false);
         }
@@ -235,7 +252,7 @@ export function WalletView({ userId }: WalletViewProps) {
         if (isNaN(amount) || amount <= 0) return;
 
         if (balance !== null && amount > balance) {
-            alert("Insufficient balance");
+            showAlert("Insufficient Balance", "You do not have enough funds in your wallet for this withdrawal.", "warning");
             return;
         }
 
@@ -255,7 +272,7 @@ export function WalletView({ userId }: WalletViewProps) {
             fetchWalletData();
         } catch (error: any) {
             console.error("Withdrawal error:", error);
-            alert("Failed to withdraw funds: " + (error.message || "Unknown error"));
+            showAlert("Withdrawal Failed", error.message || "We could not process your withdrawal request. Please try again.", "error");
         } finally {
             setWithdrawing(false);
         }
@@ -444,6 +461,14 @@ export function WalletView({ userId }: WalletViewProps) {
             </div>
 
 
+            <AlertModal
+                isOpen={alertConfig.open}
+                onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
+                onConfirm={alertConfig.onConfirm}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+            />
         </div>
     );
 }

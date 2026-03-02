@@ -44,6 +44,24 @@ export function LoanDetailsModal({
     const progress = Math.round(((loan.funded_amount || 0) / loan.amount) * 100);
     const profile = loan.profiles;
 
+    // Late fee calculation logic (consistent with BorrowerView)
+    let lateFee = 0;
+    let isLate = false;
+    let daysLate = 0;
+
+    if (loan.due_date && loan.status === 'funded') {
+        const dueDate = new Date(loan.due_date);
+        const now = new Date();
+        if (now > dueDate) {
+            isLate = true;
+            daysLate = Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+            if (daysLate > 0) {
+                const baseRepayment = loan.amount + (loan.amount * (loan.interest_rate / 100));
+                lateFee = (baseRepayment * (loan.late_fee_rate || 5.0) / 100.0) * (daysLate / 30.0);
+            }
+        }
+    }
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -63,8 +81,11 @@ export function LoanDetailsModal({
                                     {loan.purpose}
                                 </DialogTitle>
                                 <div className="flex items-center gap-3">
-                                    <span className="px-3 py-1 bg-orange-50 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-orange-100">
-                                        {loan.status === 'approved' ? 'Open for Funding' : loan.status}
+                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${isLate ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                            loan.status === 'funded' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                'bg-orange-50 text-orange-600 border-orange-100'
+                                        }`}>
+                                        {isLate ? 'OVERDUE' : loan.status === 'approved' ? 'Open for Funding' : loan.status}
                                     </span>
                                     <span className="text-slate-400 text-xs font-bold">
                                         ID: {loan.id.slice(0, 8)}
@@ -166,12 +187,28 @@ export function LoanDetailsModal({
                                 <div className="flex items-center justify-between py-3 border-b border-slate-100/50">
                                     <div className="flex items-center gap-2">
                                         <Clock className="h-4 w-4 text-slate-400" />
-                                        <span className="text-xs font-bold text-slate-500 tracking-tight">Expected Maturity</span>
+                                        <span className="text-xs font-bold text-slate-500 tracking-tight">
+                                            {loan.status === 'funded' ? 'Due Date' : 'Expected Maturity'}
+                                        </span>
                                     </div>
-                                    <span className="text-sm font-black text-slate-900">
-                                        {new Date(new Date().setMonth(new Date().getMonth() + (loan.duration_months || 12))).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                                    <span className={`text-sm font-black ${isLate ? 'text-rose-600' : 'text-slate-900'}`}>
+                                        {loan.due_date ?
+                                            new Date(loan.due_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) :
+                                            new Date(new Date().setMonth(new Date().getMonth() + (loan.duration_months || 12))).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+                                        }
                                     </span>
                                 </div>
+                                {isLate && (
+                                    <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Shield className="h-3 w-3 text-rose-600" />
+                                            <span className="text-[10px] font-black text-rose-900/60 uppercase tracking-widest">Overdue Penalty</span>
+                                        </div>
+                                        <p className="text-xl font-black text-rose-600">
+                                            {formatINR(lateFee)} <span className="text-[10px] text-rose-400">Accrued ({daysLate} days late)</span>
+                                        </p>
+                                    </div>
+                                )}
                                 <div className="p-4 rounded-2xl bg-orange-50/50 border border-orange-100">
                                     <div className="flex items-center gap-2 mb-2">
                                         <Target className="h-3 w-3 text-orange-600" />

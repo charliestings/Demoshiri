@@ -43,6 +43,33 @@ export async function POST(req: Request) {
         if (data.order_status === 'PAID') {
             const amount = data.order_amount;
 
+            // Fetch detailed payment info to get payment_method and cf_payment_id
+            let paymentMethod = 'unknown';
+            let cfPaymentId = 'unknown';
+
+            try {
+                const paymentsResponse = await fetch(`${baseUrl}/orders/${order_id}/payments`, {
+                    method: 'GET',
+                    headers: {
+                        'x-client-id': appId,
+                        'x-client-secret': secretKey,
+                        'x-api-version': '2023-08-01',
+                    }
+                });
+
+                if (paymentsResponse.ok) {
+                    const payments = await paymentsResponse.json();
+                    if (Array.isArray(payments) && payments.length > 0) {
+                        // Get the latest successful payment
+                        const successfulPayment = payments.find(p => p.payment_status === 'SUCCESS') || payments[0];
+                        cfPaymentId = successfulPayment.cf_payment_id;
+                        paymentMethod = successfulPayment.payment_group || 'other';
+                    }
+                }
+            } catch (pErr) {
+                console.warn('Failed to fetch detailed payment info:', pErr);
+            }
+
             // Create an authenticated client scoped to the user's JWT token
             const authHeader = req.headers.get('Authorization');
             if (!authHeader) {
@@ -64,6 +91,8 @@ export async function POST(req: Request) {
                     cf_order_id: data.cf_order_id,
                     amount: amount,
                     status: data.order_status,
+                    payment_method: paymentMethod,
+                    cf_payment_id: cfPaymentId,
                     raw_response: data
                 }, { onConflict: 'order_id' });
 

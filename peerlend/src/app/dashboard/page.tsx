@@ -15,6 +15,7 @@ import { WalletView } from "@/components/dashboard/WalletView";
 import { TransactionsView } from "@/components/dashboard/TransactionsView";
 import { TransactionSuccessModal } from "@/components/dashboard/TransactionSuccessModal";
 import { PinVerificationModal } from "@/components/dashboard/PinVerificationModal";
+import { AlertModal, AlertType } from "@/components/dashboard/AlertModal";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -70,7 +71,43 @@ function DashboardContent() {
     const [lastInvestPurpose, setLastInvestPurpose] = useState("");
     const [isPinModalOpen, setIsPinModalOpen] = useState(false);
     const [loanToRepay, setLoanToRepay] = useState<any>(null);
+
+    const getRepaymentBreakdown = (loan: any) => {
+        if (!loan) return { total: 0, interest: 0, lateFee: 0, isLate: false };
+        const baseInterest = loan.amount * (loan.interest_rate / 100.0);
+        const baseRepayment = loan.amount + baseInterest;
+        let lateFee = 0;
+        let isLate = false;
+        if (loan.due_date) {
+            const dueDate = new Date(loan.due_date);
+            const now = new Date();
+            if (now > dueDate) {
+                isLate = true;
+                const daysLate = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+                if (daysLate > 0) {
+                    lateFee = (baseRepayment * (loan.late_fee_rate || 5.0) / 100.0) * (daysLate / 30.0);
+                }
+            }
+        }
+        return { total: baseRepayment + lateFee, interest: baseInterest, lateFee, isLate };
+    };
     const [hasPin, setHasPin] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        open: boolean;
+        title: string;
+        message: string;
+        type: AlertType;
+        onConfirm?: () => void;
+    }>({
+        open: false,
+        title: "",
+        message: "",
+        type: "info"
+    });
+
+    const showAlert = (title: string, message: string, type: AlertType = "info", onConfirm?: () => void) => {
+        setAlertConfig({ open: true, title, message, type, onConfirm });
+    };
 
     const fetchNotificationsCount = useCallback(async () => {
         if (!user) return;
@@ -162,7 +199,7 @@ function DashboardContent() {
 
         if (error) {
             console.error("Error updating loan status:", error);
-            alert("Failed to update loan status");
+            showAlert("Update Failed", "We could not update the loan status. Please try again.", "error");
         } else {
             // Create notification for borrower
             if (loanData) {
@@ -193,7 +230,7 @@ function DashboardContent() {
 
         if (error) {
             console.error("Error updating KYC status (Full Object):", JSON.stringify(error, null, 2));
-            alert(`Failed to update KYC status: ${error.message || 'Unknown error'} (Code: ${error.code || 'N/A'})`);
+            showAlert("Verification Error", `Failed to update KYC status: ${error.message || 'Unknown error'}`, "error");
         } else {
             // Create notification for user
             try {
@@ -404,6 +441,7 @@ function DashboardContent() {
                                                 }}
                                                 onRepayInitiated={setLoanToRepay}
                                                 onOpenPinModal={setIsPinModalOpen}
+                                                showAlert={showAlert}
                                             />
                                         ) : isAdmin ? (
                                             <AdminView
@@ -433,6 +471,7 @@ function DashboardContent() {
                                     }}
                                     onRepayInitiated={setLoanToRepay}
                                     onOpenPinModal={setIsPinModalOpen}
+                                    showAlert={showAlert}
                                 />
                             )}
 
@@ -520,21 +559,30 @@ function DashboardContent() {
                         if (rpcError) throw new Error(rpcError.message);
 
                         if (data && data.success === false) {
-                            alert(data.error || "Repayment failed");
+                            showAlert("Repayment Failed", data.error || "The repayment process failed. Please check your balance.", "error");
                             return;
                         }
 
                         setShowRepaySuccess(true);
-                        setLastRepayAmount(repaymentAmount);
+                        setLastRepayAmount(data?.repaid_amount || getRepaymentBreakdown(loanToRepay).total);
                         setLastRepayPurpose(loanToRepay.purpose);
                         fetchData(); // Refresh all data
                     } catch (err: any) {
                         console.error("Repayment error:", err);
-                        alert("Repayment failed: " + err.message);
+                        showAlert("System Error", "The repayment failed due to a technical error: " + err.message, "error");
                     }
                 }}
                 title="Authorize Repayment"
-                description={`Enter your 6-digit transaction PIN to confirm the repayment of ${formatINR(loanToRepay ? (loanToRepay.amount + (loanToRepay.amount * (loanToRepay.interest_rate / 100.0))) : 0)}.`}
+                description={`Enter your 6-digit transaction PIN to confirm the repayment of ${formatINR(getRepaymentBreakdown(loanToRepay).total)}.`}
+            />
+
+            <AlertModal
+                isOpen={alertConfig.open}
+                onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
+                onConfirm={alertConfig.onConfirm}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
             />
         </div>
     );
@@ -546,31 +594,46 @@ function BorrowerProfileModal({ profile, loan, onApprove, onReject }: { profile:
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (open && profile?.id) {
-            const fetchBorrowerStats = async () => {
-                setLoading(true);
-                const { data, error } = await supabase
-                    .from("loans")
-                    .select("amount, status")
-                    .eq("borrower_id", profile.id);
+        if (!open) return;
 
-                if (!error && data) {
-                    const totalRequests = data.length;
-                    const approvedLoans = data.filter(l => l.status === 'approved' || l.status === 'funded');
-                    const totalBorrowed = approvedLoans.reduce((sum, l) => sum + (l.amount || 0), 0);
-                    const successRate = totalRequests > 0 ? (approvedLoans.length / totalRequests) * 100 : 0;
-
-                    setStats({
-                        totalRequests,
-                        totalBorrowed,
-                        successRate: Math.round(successRate),
-                        memberSince: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'
-                    });
-                }
+        const fetchBorrowerStats = async () => {
+            setLoading(true);
+            // Handle potential array-wrapped profile or missing ID
+            const profileId = Array.isArray(profile) ? profile[0]?.id : profile?.id;
+            if (!profileId) {
                 setLoading(false);
-            };
-            fetchBorrowerStats();
-        }
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from("loans")
+                .select("amount, status")
+                .eq("borrower_id", profileId);
+
+            if (!error && data) {
+                const totalRequests = data.length;
+                const successfulLoans = data.filter(l => ['approved', 'funded', 'repaid'].includes(l.status));
+                const totalBorrowed = successfulLoans.reduce((sum, l) => sum + (l.amount || 0), 0);
+
+                // Success rate based on closed requests (approved/funded/repaid vs rejected)
+                const closedRequests = data.filter(l => l.status !== 'pending' && l.status !== 'rejected');
+                const rejectedRequests = data.filter(l => l.status === 'rejected');
+                const totalClosed = closedRequests.length + rejectedRequests.length;
+
+                const successRate = totalClosed > 0
+                    ? (closedRequests.length / totalClosed) * 100
+                    : (data.some(l => l.status === 'pending') ? 100 : 0);
+
+                setStats({
+                    totalRequests,
+                    totalBorrowed,
+                    successRate: Math.round(successRate),
+                    memberSince: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'
+                });
+            }
+            setLoading(false);
+        };
+        fetchBorrowerStats();
     }, [open, profile?.id, profile.created_at]);
 
     // Real Data from Profile
@@ -1113,7 +1176,7 @@ function AdminView({ loans, kycUsers, onUpdate, onKYCUpdate }: {
     );
 }
 
-function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, onShowRepaySuccess, onRepayInitiated, onOpenPinModal }: {
+function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, onShowRepaySuccess, onRepayInitiated, onOpenPinModal, showAlert }: {
     loans: any[],
     userId: string,
     onLoanCreated: () => void,
@@ -1121,7 +1184,8 @@ function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, o
     onShowWallet?: () => void,
     onShowRepaySuccess: (amount: number, purpose: string) => void,
     onRepayInitiated: (loan: any) => void,
-    onOpenPinModal: (isOpen: boolean) => void
+    onOpenPinModal: (isOpen: boolean) => void,
+    showAlert: (title: string, message: string, type: AlertType) => void
 }) {
     const totalBorrowed = loans.reduce((acc, l) => acc + (l.amount || 0), 0);
     const pendingLoansCount = loans.filter(l => l.status === 'pending').length;
@@ -1203,11 +1267,33 @@ function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, o
                 ) : (
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
                         {loans.map((loan) => {
-                            const repaymentAmount = loan.amount + (loan.amount * (loan.interest_rate / 100));
+                            const baseInterest = loan.amount * (loan.interest_rate / 100);
+                            const baseRepayment = loan.amount + baseInterest;
+
+                            // Fine calculation logic (pro-rata daily based on monthly rate)
+                            let lateFee = 0;
+                            let isLate = false;
+                            let daysLate = 0;
+
+                            if (loan.due_date && loan.status === 'funded') {
+                                const dueDate = new Date(loan.due_date);
+                                const now = new Date();
+                                if (now > dueDate) {
+                                    isLate = true;
+                                    daysLate = Math.max(0, Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+                                    if (daysLate > 0) {
+                                        lateFee = (baseRepayment * (loan.late_fee_rate || 5.0) / 100.0) * (daysLate / 30.0);
+                                    }
+                                }
+                            }
+
+                            const totalRepaymentAmount = baseRepayment + lateFee;
+
                             return (
                                 <Card key={loan.id} className="glass-card border-slate-100 bg-white shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group overflow-hidden">
-                                    <div className={`h-1.5 w-full ${loan.status === 'funded' ? 'bg-emerald-500' :
-                                        loan.status === 'pending' ? 'bg-slate-300' : 'bg-orange-500'}`} />
+                                    <div className={`h-1.5 w-full ${isLate ? 'bg-rose-500' :
+                                        loan.status === 'funded' ? 'bg-emerald-500' :
+                                            loan.status === 'pending' ? 'bg-slate-300' : 'bg-orange-500'}`} />
                                     <CardContent className="p-6">
                                         <div className="flex justify-between items-start mb-6">
                                             <div>
@@ -1218,12 +1304,20 @@ function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, o
                                                     <span className="text-xs font-bold text-rose-600 uppercase tracking-tighter">{loan.interest_rate}% APR</span>
                                                 </div>
                                             </div>
-                                            <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${loan.status === 'funded' ? 'bg-emerald-50 text-emerald-600' :
-                                                loan.status === 'pending' ? 'bg-slate-50 text-slate-600' :
-                                                    loan.status === 'approved' ? 'bg-orange-50 text-orange-600' :
-                                                        'bg-rose-50 text-rose-600'
-                                                }`}>
-                                                {loan.status === 'pending' ? 'Reviewing' : loan.status}
+                                            <div className="flex flex-col items-end gap-1">
+                                                <div className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${isLate ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                                                    loan.status === 'funded' ? 'bg-emerald-50 text-emerald-600' :
+                                                        loan.status === 'pending' ? 'bg-slate-50 text-slate-600' :
+                                                            loan.status === 'approved' ? 'bg-orange-50 text-orange-600' :
+                                                                'bg-rose-50 text-rose-600'
+                                                    }`}>
+                                                    {isLate ? 'OVERDUE' : loan.status === 'pending' ? 'Reviewing' : loan.status}
+                                                </div>
+                                                {loan.due_date && loan.status === 'funded' && (
+                                                    <p className={`text-[8px] font-bold uppercase ${isLate ? 'text-rose-500' : 'text-slate-400'}`}>
+                                                        Due: {new Date(loan.due_date).toLocaleDateString()}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
 
@@ -1239,7 +1333,6 @@ function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, o
                                         </div>
 
                                         <div className="mb-6">
-                                            {/* Progress Bar placeholder since Progress component is missing */}
                                             <div className="w-full bg-slate-50 border border-slate-100 rounded-full h-2 overflow-hidden">
                                                 <motion.div
                                                     initial={{ width: 0 }}
@@ -1254,21 +1347,31 @@ function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, o
                                             <div className="pt-4 border-t border-slate-50">
                                                 <div className="flex justify-between items-center mb-4">
                                                     <div>
-                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">To Repay</p>
-                                                        <p className="text-lg font-black text-slate-900">{formatINR(repaymentAmount)}</p>
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Repayment</p>
+                                                        <p className="text-lg font-black text-slate-900">{formatINR(totalRepaymentAmount)}</p>
                                                     </div>
+                                                    {lateFee > 0 && (
+                                                        <div className="text-right">
+                                                            <p className="text-[8px] font-black text-rose-500 uppercase tracking-widest">Includes Fine</p>
+                                                            <p className="text-xs font-black text-rose-600 mt-0.5">+{formatINR(lateFee)}</p>
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <Button
                                                     onClick={() => {
-                                                        const total = loan.amount + (loan.amount * (loan.interest_rate / 100.0));
-                                                        if (!confirm(`Are you sure you want to repay this loan? Total amount: ${formatINR(total)}`)) return;
-
-                                                        onRepayInitiated(loan);
-                                                        setTimeout(() => {
-                                                            onOpenPinModal(true);
-                                                        }, 300);
+                                                        showAlert(
+                                                            "Confirm Repayment",
+                                                            `You are about to repay ${formatINR(totalRepaymentAmount)} ${lateFee > 0 ? `(including ₹${Math.round(lateFee)} late penalty for ${daysLate} days)` : ''}. This will be deducted from your wallet.`,
+                                                            "confirm",
+                                                            () => {
+                                                                onRepayInitiated(loan);
+                                                                setTimeout(() => {
+                                                                    onOpenPinModal(true);
+                                                                }, 100);
+                                                            }
+                                                        );
                                                     }}
-                                                    className="w-full bg-slate-900 border-0 hover:bg-black text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-10"
+                                                    className={`w-full ${isLate ? 'bg-rose-600 hover:bg-rose-700' : 'bg-slate-900 hover:bg-black'} border-0 text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-10`}
                                                 >
                                                     Repay Loan Now
                                                 </Button>
