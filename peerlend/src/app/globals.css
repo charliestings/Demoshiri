@@ -175,10 +175,14 @@
   background-clip: text;
 }
 
-@utility scrollbar-hide {
+.scrollbar-hide {
   -ms-overflow-style: none;
+  /* IE and Edge */
   scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
+  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari and Opera */
 }

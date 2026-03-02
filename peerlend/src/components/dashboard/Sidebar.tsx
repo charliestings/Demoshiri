@@ -57,6 +57,15 @@ export function Sidebar({ activeTab, setActiveTab, userRole, isAdmin, userEmail,
 
     return (
         <>
+            <style jsx global>{`
+                .scrollbar-hide::-webkit-scrollbar {
+                    display: none !important;
+                }
+                .scrollbar-hide {
+                    -ms-overflow-style: none !important;
+                    scrollbar-width: none !important;
+                }
+            `}</style>
             {/* Mobile Overlay */}
             {mobileOpen && (
                 <div
@@ -89,7 +98,7 @@ export function Sidebar({ activeTab, setActiveTab, userRole, isAdmin, userEmail,
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 px-4 space-y-1 py-4 overflow-y-auto scrollbar-hide">
+                <nav id="sidebar-nav" className="flex-1 px-4 space-y-1 py-4 overflow-y-auto scrollbar-hide">
                     {menuItems.map((item) => {
                         const isActive = activeTab === item.id;
                         return (
