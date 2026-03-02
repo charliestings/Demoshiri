@@ -93,7 +93,7 @@ export default function Home() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-            className="relative h-[600px] w-full hidden lg:block"
+            className="relative h-[400px] lg:h-[600px] w-full"
           >
             {/* Main Image Mask */}
             <div className="absolute inset-0 rounded-[3rem] overflow-hidden shadow-2xl shadow-rose-900/20 rotate-3 transition-transform hover:rotate-2 duration-700">
@@ -325,56 +325,58 @@ export default function Home() {
 
 
       <footer className="py-20 px-6 border-t border-rose-100 bg-orange-50/40 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto grid md:grid-cols-5 gap-12 mb-16">
-          <div className="col-span-2">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-12 justify-between mb-16">
+          <div className="lg:max-w-xs">
             <div className="flex items-center gap-3 mb-6">
               <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-500/20">
                 <span className="font-bold text-xl uppercase italic">P</span>
               </div>
               <span className="text-2xl font-black tracking-tight text-rose-950 font-outfit">PeerLend</span>
             </div>
-            <p className="text-rose-900/60 leading-relaxed font-medium max-w-xs text-sm">
+            <p className="text-rose-900/60 leading-relaxed font-medium text-sm">
               We believe in people, transparency, and good vibes.
             </p>
           </div>
 
-          {[
-            {
-              header: "Platform", links: [
-                { label: "Earn & Invest", href: "/dashboard?tab=market" },
-                { label: "Get a Loan", href: "/dashboard?tab=loans" },
-                { label: "How it Works", href: "/how-it-works" }
-              ]
-            },
-            {
-              header: "Company", links: [
-                { label: "Our Story", href: "/about" },
-                { label: "Careers", href: "/careers" },
-                { label: "Press", href: "/press" }
-              ]
-            },
-            {
-              header: "Support", links: [
-                { label: "Help Center", href: "/support" },
-                { label: "Safe & Secure", href: "/support" },
-                { label: "Contact Us", href: "/contact" }
-              ]
-            },
-          ].map((col, i) => (
-            <div key={i}>
-              <h4 className="font-black text-rose-900 mb-6 text-xs uppercase tracking-[0.2em]">{col.header}</h4>
-              <ul className="space-y-4 text-sm text-rose-900/60 font-medium">
-                {col.links.map((link, j) => (
-                  <li key={j}><Link href={link.href} className="hover:text-rose-600 transition-colors">{link.label}</Link></li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 lg:gap-16 w-full lg:w-auto">
+            {[
+              {
+                header: "Platform", links: [
+                  { label: "Earn & Invest", href: "/dashboard?tab=market" },
+                  { label: "Get a Loan", href: "/dashboard?tab=loans" },
+                  { label: "How it Works", href: "/how-it-works" }
+                ]
+              },
+              {
+                header: "Company", links: [
+                  { label: "Our Story", href: "/about" },
+                  { label: "Careers", href: "/careers" },
+                  { label: "Press", href: "/press" }
+                ]
+              },
+              {
+                header: "Support", links: [
+                  { label: "Help Center", href: "/support" },
+                  { label: "Safe & Secure", href: "/support" },
+                  { label: "Contact Us", href: "/contact" }
+                ]
+              },
+            ].map((col, i) => (
+              <div key={i}>
+                <h4 className="font-black text-rose-900 mb-6 text-xs uppercase tracking-[0.2em]">{col.header}</h4>
+                <ul className="space-y-4 text-sm text-rose-900/60 font-medium">
+                  {col.links.map((link, j) => (
+                    <li key={j}><Link href={link.href} className="hover:text-rose-600 transition-colors">{link.label}</Link></li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-rose-300 text-xs font-bold uppercase tracking-widest border-t border-rose-100 pt-10">
-          <span className="text-rose-400/60">© 2026 PeerLend — Built for people.</span>
-          <div className="flex gap-8 mt-6 md:mt-0">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center text-rose-400/60 text-xs font-bold uppercase tracking-widest border-t border-rose-100 pt-10">
+          <span>© 2026 PeerLend — Built for people.</span>
+          <div className="flex flex-wrap gap-6 mt-6 md:mt-0">
             <Link href="/privacy-policy" className="hover:text-rose-600 transition-colors">Privacy</Link>
             <Link href="/terms-of-service" className="hover:text-rose-600 transition-colors">Terms</Link>
             <Link href="/cookies" className="hover:text-rose-600 transition-colors">Cookies</Link>

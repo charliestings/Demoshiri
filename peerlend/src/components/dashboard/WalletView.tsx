@@ -23,6 +23,7 @@ import { formatINR } from "@/lib/formatters";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AlertModal, AlertType } from "./AlertModal";
 
 interface WalletViewProps {
     userId: string;
@@ -39,6 +40,25 @@ export function WalletView({ userId }: WalletViewProps) {
     const [withdrawing, setWithdrawing] = useState(false);
     const [showWithdrawModal, setShowWithdrawModal] = useState(false);
     const [kycStatus, setKycStatus] = useState<string>('not_started');
+    const [totalInvested, setTotalInvested] = useState(0);
+    const [totalBorrowed, setTotalBorrowed] = useState(0);
+    const [totalEarnings, setTotalEarnings] = useState(0);
+    const [alertConfig, setAlertConfig] = useState<{
+        open: boolean;
+        title: string;
+        message: string;
+        type: AlertType;
+        onConfirm?: () => void;
+    }>({
+        open: false,
+        title: "",
+        message: "",
+        type: "info"
+    });
+
+    const showAlert = (title: string, message: string, type: AlertType = "info", onConfirm?: () => void) => {
+        setAlertConfig({ open: true, title, message, type, onConfirm });
+    };
 
     const fetchWalletData = useCallback(async () => {
         try {
@@ -52,13 +72,15 @@ export function WalletView({ userId }: WalletViewProps) {
             if (walletError && walletError.code !== 'PGRST116') throw walletError;
             setBalance(wallet?.balance || 0);
 
-            // 1b. Fetch KYC Status
-            const { data: profile } = await supabase
+            // 1b. Fetch KYC Status - resilient fetch
+            const { data: profile, error: profileErr } = await supabase
                 .from("profiles")
                 .select("kyc_status")
                 .eq("id", userId)
                 .single();
+            if (profileErr) console.error("WalletView: KYC fetch error", profileErr);
             setKycStatus(profile?.kyc_status || 'not_started');
+            console.log("WalletView: Data loaded", { balance: wallet?.balance, kycStatus: profile?.kyc_status });
 
             // 2. Fetch Transactions
             const { data: txns, error: txnsError } = await supabase
@@ -69,6 +91,61 @@ export function WalletView({ userId }: WalletViewProps) {
 
             if (txnsError) throw txnsError;
             setTransactions(txns || []);
+
+            // 3. Fetch Total Invested
+            const { data: investments, error: investError } = await supabase
+                .from("investments")
+                .select("amount")
+                .eq("investor_id", userId);
+
+            if (!investError && investments) {
+                const total = investments.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+                setTotalInvested(total);
+            }
+
+            // 4. Fetch Total Borrowed (from funded or repaid loans)
+            const { data: borrowedLoans, error: borrowError } = await supabase
+                .from("loans")
+                .select("amount")
+                .eq("borrower_id", userId)
+                .in("status", ["funded", "repaid"]);
+
+            if (!borrowError && borrowedLoans) {
+                const total = borrowedLoans.reduce((sum, loan) => sum + (loan.amount || 0), 0);
+                setTotalBorrowed(total);
+            }
+
+            // 5. Fetch Total Earnings (interest from repayments)
+            // Earnings are tracked in wallet_transactions as 'earning' type
+            const { data: earnings, error: earnError } = await supabase
+                .from("wallet_transactions")
+                .select("amount")
+                .eq("wallet_id", userId)
+                .eq("type", "earning");
+
+            if (!earnError && earnings) {
+                // For 'earning' tx, the amount includes principal + interest. 
+                // However, the RPC process_loan_repayment logs the FULL repayment (principal + interest) as 'earning'.
+                // To get actual profit, we should look at the difference? 
+                // Actually, let's keep it simple: sum of 'earning' amounts minus the principal of tied investments.
+                // For now, we'll sum the profit portion if we can, or just sum 'earning' rows.
+                // The current RPC adds 'earning' with the FULL (principal+interest) amount.
+                // Let's calculate profit = sum(earning) - sum(original investments for those loans).
+
+                let totalProfit = 0;
+                // Query all investments that have been repaid to find cost basis
+                const { data: repaidInv } = await supabase
+                    .from("investments")
+                    .select("amount, loans!inner(status)")
+                    .eq("investor_id", userId)
+                    .eq("loans.status", "repaid");
+
+                const costBasis = repaidInv?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0;
+                const totalReturns = earnings.reduce((sum, tn) => sum + (tn.amount || 0), 0);
+
+                totalProfit = Math.max(0, totalReturns - costBasis);
+                setTotalEarnings(totalProfit);
+            }
 
             // Add Artificial Delay so user can see Skeletons!
             await new Promise(resolve => setTimeout(resolve, 1500));
@@ -91,25 +168,80 @@ export function WalletView({ userId }: WalletViewProps) {
 
         setDepositing(true);
         try {
-            const { data, error } = await supabase.rpc('deposit_funds', {
-                amount_to_add: amount
+            console.log("WalletView: Creating Cashfree order", { amount, userId });
+            const orderResponse = await fetch('/api/cashfree/create-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount, userId })
+            });
+            const orderData = await orderResponse.json();
+            console.log("WalletView: Order data received", orderData);
+
+            if (!orderResponse.ok || !orderData.payment_session_id) {
+                throw new Error(orderData.error || "Failed to create order");
+            }
+
+            const { payment_session_id, order_id } = orderData;
+
+            // 2. Load SDK
+            console.log("WalletView: Loading Cashfree SDK");
+            // @ts-ignore
+            const { load } = await import('@cashfreepayments/cashfree-js');
+            const cashfree = await load({ mode: 'sandbox' });
+            console.log("WalletView: SDK Loaded, opening checkout");
+
+            // 3. Open Checkout Modal
+            const checkoutOptions = {
+                paymentSessionId: payment_session_id,
+                redirectTarget: "_modal",
+            };
+
+            cashfree.checkout(checkoutOptions).then((result: any) => {
+                if (result.error) {
+                    console.log("Checkout closed or error:", result.error);
+                    showAlert("Payment Failed", "Payment was cancelled or failed to process.", "error");
+                    setDepositing(false);
+                }
+                if (result.paymentDetails) {
+                    // 4. Verify Payment securely on the backend using user's auth JWT
+                    supabase.auth.getSession().then(({ data: { session } }) => {
+                        fetch('/api/cashfree/verify', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${session?.access_token}`
+                            },
+                            body: JSON.stringify({ order_id, user_id: userId })
+                        })
+                            .then(res => res.json())
+                            .then(verifyData => {
+                                if (verifyData.success) {
+                                    setDepositAmount("");
+                                    setShowDepositModal(false);
+                                    fetchWalletData();
+                                    showAlert("Deposit Success", "Funds have been added to your wallet successfully!", "success");
+                                } else {
+                                    showAlert("Verification Failed", verifyData.message || verifyData.error || "Payment verification failed.", "error");
+                                }
+                            })
+                            .catch(verifyErr => {
+                                console.error("Verification error:", verifyErr);
+                                showAlert("Error", "There was an error verifying your payment. Please contact support.", "error");
+                            })
+                            .finally(() => {
+                                setDepositing(false);
+                            });
+                    });
+                }
             });
 
-            if (error) throw error;
-
-            setDepositAmount("");
-            setShowDepositModal(false);
-            fetchWalletData();
         } catch (error: any) {
             console.error("Deposit error:", error);
-
-            // Check if it's the specific KYC error we added to Supabase
-            if (error?.message?.includes('KYC verification')) {
-                alert("You must complete your KYC verification before you can add funds to your wallet.");
+            if (error?.message?.includes('KYC')) {
+                showAlert("KYC Required", "You must complete your KYC verification before adding funds to your wallet.", "warning");
             } else {
-                alert("Failed to deposit funds: " + (error?.message || "Please make sure your KYC is approved."));
+                showAlert("System Error", error?.message || "Failed to initiate deposit. Please try again.", "error");
             }
-        } finally {
             setDepositing(false);
         }
     };
@@ -120,7 +252,7 @@ export function WalletView({ userId }: WalletViewProps) {
         if (isNaN(amount) || amount <= 0) return;
 
         if (balance !== null && amount > balance) {
-            alert("Insufficient balance");
+            showAlert("Insufficient Balance", "You do not have enough funds in your wallet for this withdrawal.", "warning");
             return;
         }
 
@@ -140,7 +272,7 @@ export function WalletView({ userId }: WalletViewProps) {
             fetchWalletData();
         } catch (error: any) {
             console.error("Withdrawal error:", error);
-            alert("Failed to withdraw funds: " + (error.message || "Unknown error"));
+            showAlert("Withdrawal Failed", error.message || "We could not process your withdrawal request. Please try again.", "error");
         } finally {
             setWithdrawing(false);
         }
@@ -201,10 +333,10 @@ export function WalletView({ userId }: WalletViewProps) {
                         <p className="text-slate-400 text-sm font-medium">Your protected capital on PeerLend.</p>
                     </div>
 
-                    <div className="flex gap-4">
+                    <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto mt-6 md:mt-0">
                         <Dialog open={showDepositModal} onOpenChange={setShowDepositModal}>
                             <DialogTrigger asChild>
-                                <Button className="bg-orange-500 hover:bg-orange-600 text-white rounded-2xl h-16 px-10 font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02]">
+                                <Button className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white rounded-2xl h-16 px-10 font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02]">
                                     <Plus className="mr-2 h-5 w-5" /> Add Funds
                                 </Button>
                             </DialogTrigger>
@@ -261,7 +393,7 @@ export function WalletView({ userId }: WalletViewProps) {
 
                         <Dialog open={showWithdrawModal} onOpenChange={setShowWithdrawModal}>
                             <DialogTrigger asChild>
-                                <Button variant="outline" className="border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-2xl h-16 px-8 font-black uppercase tracking-widest transition-all">
+                                <Button variant="outline" className="w-full sm:w-auto border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-2xl h-16 px-8 font-black uppercase tracking-widest transition-all">
                                     Withdraw
                                 </Button>
                             </DialogTrigger>
@@ -309,9 +441,9 @@ export function WalletView({ userId }: WalletViewProps) {
             {/* Quick Actions / Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                    { label: "Total Invested", val: "₹1,24,000", icon: TrendingUp, color: "rose" },
-                    { label: "Total Borrowed", val: "₹0", icon: ArrowDownCircle, color: "orange" },
-                    { label: "Platform Earnings", val: "₹12,400", icon: DollarSign, color: "emerald" },
+                    { label: "Total Invested", val: formatINR(totalInvested), icon: TrendingUp, color: "rose" },
+                    { label: "Total Borrowed", val: formatINR(totalBorrowed), icon: ArrowDownCircle, color: "orange" },
+                    { label: "Profit Earned", val: formatINR(totalEarnings), icon: DollarSign, color: "emerald" },
                 ].map((stat, i) => (
                     <Card key={i} className="rounded-3xl border-slate-100 shadow-sm bg-white overflow-hidden group">
                         <CardContent className="p-6">
@@ -329,6 +461,14 @@ export function WalletView({ userId }: WalletViewProps) {
             </div>
 
 
+            <AlertModal
+                isOpen={alertConfig.open}
+                onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
+                onConfirm={alertConfig.onConfirm}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+            />
         </div>
     );
 }

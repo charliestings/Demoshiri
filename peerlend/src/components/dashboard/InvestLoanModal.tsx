@@ -7,7 +7,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { Loader2, DollarSign, Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { formatINR } from "@/lib/formatters";
-import { TransactionSuccessModal } from "./TransactionSuccessModal";
+import { PinVerificationModal } from "./PinVerificationModal";
+import { AlertModal, AlertType } from "./AlertModal";
 
 interface InvestLoanModalProps {
     loan: any;
@@ -16,6 +17,7 @@ interface InvestLoanModalProps {
     kycStatus?: string;
     onShowWallet?: () => void;
     onShowSuccess?: (amount: number, purpose: string) => void;
+    hasPin?: boolean;
 }
 
 export function InvestLoanModal({
@@ -24,30 +26,77 @@ export function InvestLoanModal({
     onInvested,
     kycStatus,
     onShowWallet,
-    onShowSuccess
+    onShowSuccess,
+    hasPin
 }: InvestLoanModalProps) {
     const [open, setOpen] = useState(false);
     const [amount, setAmount] = useState("");
     const [loading, setLoading] = useState(false);
+    const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        open: boolean;
+        title: string;
+        message: string;
+        type: AlertType;
+    }>({
+        open: false,
+        title: "",
+        message: "",
+        type: "info"
+    });
     const router = useRouter();
 
-    const handleInvest = async (e: React.FormEvent) => {
+    const showAlert = (title: string, message: string, type: AlertType = "info") => {
+        setAlertConfig({ open: true, title, message, type });
+    };
+
+    const handleInvestInitiate = (e: React.FormEvent) => {
         e.preventDefault();
         const investAmount = parseFloat(amount);
 
         if (isNaN(investAmount) || investAmount <= 0) {
-            alert("Please enter a valid amount");
+            showAlert("Invalid Amount", "Please enter a valid amount to invest.", "warning");
             return;
         }
 
         if (kycStatus !== 'approved') {
-            alert("You must have an approved KYC status to invest.");
+            showAlert("KYC Required", "You must have an approved KYC status to invest in opportunities.", "warning");
             return;
         }
 
         const remainingNeeded = loan.amount - (loan.funded_amount || 0);
         if (investAmount > remainingNeeded) {
-            alert(`Amount exceeds remaining funds needed (${formatINR(remainingNeeded)})`);
+            showAlert("Limit Exceeded", `The investment amount exceeds the remaining funds needed (${formatINR(remainingNeeded)}).`, "warning");
+            return;
+        }
+
+        console.log("InvestModal: Initiating investment", { amount, hasPin });
+
+        if (!hasPin) {
+            showAlert("PIN Missing", "Please set your 6-digit Transaction PIN in Settings before investing.", "warning");
+            onShowSuccess?.(0, "redirect_settings"); // Optional: handle redirect in parent
+            return;
+        }
+
+        // 1. Close Amount Modal first
+        setOpen(false);
+        console.log("InvestModal: Closing amount dialog");
+
+        // 2. Open PIN Modal after a small delay
+        setTimeout(() => {
+            console.log("InvestModal: Opening PIN verification modal");
+            setIsPinModalOpen(true);
+        }, 500); // Increased delay for Edge/Radix stability
+    };
+
+    const handleActualInvest = async () => {
+        const investAmount = parseFloat(amount);
+        console.log("InvestModal: handleActualInvest called", { amount, investAmount });
+
+        if (isNaN(investAmount) || investAmount <= 0) {
+            console.error("InvestModal: Invalid amount detected during transaction", { amount });
+            showAlert("Investment Error", "Investment amount is missing or invalid. Please try again.", "error");
+            setIsPinModalOpen(false);
             return;
         }
 
@@ -66,20 +115,20 @@ export function InvestLoanModal({
             }
 
             if (data && data.success === false) {
-                alert(data.error || "Failed to process investment");
-                setLoading(false);
+                showAlert("Investment Failed", data.error || "We could not process your investment. Please try again later.", "error");
                 return;
             }
 
-            setOpen(false);
+            console.log("InvestModal: Success!", { investAmount });
             onShowSuccess?.(investAmount, loan.purpose);
             setAmount("");
+            setIsPinModalOpen(false);
             onInvested();
             router.refresh();
 
         } catch (error: any) {
             console.error("Error investing:", error);
-            alert("Failed to process investment: " + (error.message || "Unknown error"));
+            showAlert("System Error", "Failed to process investment: " + (error.message || "Unknown error"), "error");
         } finally {
             setLoading(false);
         }
@@ -123,7 +172,7 @@ export function InvestLoanModal({
                             </Button>
                         </div>
                     ) : (
-                        <form onSubmit={handleInvest} className="px-8 pb-10 space-y-6">
+                        <form onSubmit={handleInvestInitiate} className="px-8 pb-10 space-y-6">
                             <div className="space-y-4">
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Investment Amount (₹)</label>
@@ -143,11 +192,11 @@ export function InvestLoanModal({
                                     </div>
                                 </div>
 
-                                <div className="flex gap-4 pt-4">
+                                <div className="flex flex-col sm:flex-row gap-4 pt-4">
                                     <Button
                                         type="submit"
                                         disabled={loading}
-                                        className="flex-[2] bg-gradient-to-r from-slate-900 to-black text-white rounded-2xl py-7 font-black uppercase tracking-widest shadow-xl shadow-slate-900/20 transition-all hover:scale-[1.02]"
+                                        className="w-full sm:flex-[2] bg-gradient-to-r from-slate-900 to-black text-white rounded-2xl py-7 font-black uppercase tracking-widest shadow-xl shadow-slate-900/20 transition-all hover:scale-[1.02]"
                                     >
                                         {loading ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : "Confirm Investment"}
                                     </Button>
@@ -155,7 +204,7 @@ export function InvestLoanModal({
                                         variant="outline"
                                         type="button"
                                         onClick={() => setOpen(false)}
-                                        className="flex-1 border-slate-100 text-slate-400 hover:text-slate-900 rounded-2xl py-7 font-black uppercase tracking-widest transition-all font-sans"
+                                        className="w-full sm:flex-1 border-slate-100 text-slate-400 hover:text-slate-900 rounded-2xl py-7 font-black uppercase tracking-widest transition-all font-sans"
                                     >
                                         Cancel
                                     </Button>
@@ -166,6 +215,21 @@ export function InvestLoanModal({
                 </DialogContent>
             </Dialog>
 
+            <PinVerificationModal
+                isOpen={isPinModalOpen}
+                onClose={() => setIsPinModalOpen(false)}
+                onSuccess={handleActualInvest}
+                title="Authorize Investment"
+                description={`Enter your 6-digit transaction PIN to confirm your investment of ${formatINR(parseFloat(amount) || 0)} in "${loan.purpose}".`}
+            />
+
+            <AlertModal
+                isOpen={alertConfig.open}
+                onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+            />
         </>
     );
 }

@@ -17,19 +17,40 @@ export function NotificationsView({ userId }: { userId: string }) {
     const fetchNotifications = async () => {
         setLoading(true);
         setError(null);
-        const { data, error: fetchError } = await supabase
-            .from("notifications")
-            .select("*")
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false });
+        try {
+            const { data, error: fetchError } = await supabase
+                .from("notifications")
+                .select("*")
+                .eq("user_id", userId)
+                .order("created_at", { ascending: false });
 
-        if (fetchError) {
-            console.error("Error fetching notifications:", fetchError);
-            setError(fetchError.message || "Failed to fetch notifications. Make sure the 'notifications' table exists in your database.");
-        } else {
-            setNotifications(data || []);
+            if (fetchError) {
+                console.error("Error fetching notifications (Detailed):", {
+                    message: fetchError.message,
+                    details: fetchError.details,
+                    hint: fetchError.hint,
+                    code: fetchError.code
+                });
+
+                let errorMsg = "Failed to fetch notifications.";
+                if (fetchError.code === '42P01') {
+                    errorMsg = "The 'notifications' table does not exist in the database.";
+                } else if (fetchError.code === '42501') {
+                    errorMsg = "Permission denied. Check Row Level Security (RLS) policies.";
+                } else {
+                    errorMsg = fetchError.message || errorMsg;
+                }
+
+                setError(errorMsg);
+            } else {
+                setNotifications(data || []);
+            }
+        } catch (err: any) {
+            console.error("Unexpected error in fetchNotifications:", err);
+            setError(err.message || "An unexpected error occurred while loading notifications.");
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     useEffect(() => {
