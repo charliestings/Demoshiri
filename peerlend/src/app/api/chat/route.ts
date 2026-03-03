@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize the Gemini AI
-
-
 const SYSTEM_PROMPT = `
 You are PeerLend AI, the intelligent assistant for the PeerLend "Smart Capital" platform. 
 Your goal is to help users navigate the dashboard, understand peer-to-peer lending, and manage their finances.
@@ -27,53 +24,43 @@ export async function POST(req: Request) {
             return NextResponse.json({ reply: "API Key missing. Please add GEMINI_API_KEY to .env.local" });
         }
 
-        // 2. Define combinations to try (Based on verified list-models results)
-        const modelNames = ["gemini-flash-latest", "gemini-2.0-flash", "gemini-pro-latest", "gemini-1.5-flash"];
-        const apiVersions = ["v1beta", "v1"];
+        // 2. Initialize the Gemini AI SDK
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({
+            model: "gemini-flash-latest",
+            systemInstruction: SYSTEM_PROMPT
+        });
 
-        let text = "";
-        let lastErrorMsg = "";
+        const formattedHistory = (history || []).map((h: any) => ({
+            role: h.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: h.content }]
+        }));
 
-        // 3. Try Combinations via Direct Fetch
-        for (const model of modelNames) {
-            for (const version of apiVersions) {
-                try {
-                    process.stdout.write(`PeerLend AI: Trying ${model} on ${version}...\n`);
-                    const url = `https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${apiKey}`;
-
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [
-                                { role: "user", parts: [{ text: SYSTEM_PROMPT }] },
-                                { role: "model", parts: [{ text: "Understood. I am PeerLend AI Assistant." }] },
-                                ...(history || []).map((h: any) => ({
-                                    role: h.role === 'assistant' ? 'model' : 'user',
-                                    parts: [{ text: h.content }]
-                                })),
-                                { role: "user", parts: [{ text: message }] }
-                            ]
-                        })
-                    });
-
-                    const data = await response.json();
-                    if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                        text = data.candidates[0].content.parts[0].text;
-                        process.stdout.write(`PeerLend AI: SUCCESS with ${model} on ${version}!\n`);
-                        return NextResponse.json({ reply: text });
-                    } else {
-                        lastErrorMsg = data.error?.message || response.statusText || "Unknown Error";
-                        process.stdout.write(`PeerLend AI: FAILED for ${model}/${version}: ${lastErrorMsg}\n`);
-                    }
-                } catch (err: any) {
-                    lastErrorMsg = err.message;
+        let validHistory: any[] = [];
+        for (const msg of formattedHistory) {
+            if (validHistory.length === 0) {
+                if (msg.role === 'model') {
+                    validHistory.push({ role: 'user', parts: [{ text: 'Hello' }] });
+                }
+                validHistory.push(msg);
+            } else {
+                if (validHistory[validHistory.length - 1].role !== msg.role) {
+                    validHistory.push(msg);
+                } else {
+                    validHistory[validHistory.length - 1].parts[0].text += `\n${msg.parts[0].text}`;
                 }
             }
         }
 
-        // 4. If all fail, return the last error
-        throw new Error(lastErrorMsg || "No models responded successfully");
+        const chat = model.startChat({
+            history: validHistory,
+        });
+
+        const result = await chat.sendMessage(message);
+        const response = await result.response;
+        const text = response.text();
+
+        return NextResponse.json({ reply: text });
 
     } catch (error: any) {
         console.error('PeerLend AI Final Error:', error.message);
