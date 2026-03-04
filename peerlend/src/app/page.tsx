@@ -375,7 +375,7 @@ export default function Home() {
         </div>
 
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center text-rose-400/60 text-xs font-bold uppercase tracking-widest border-t border-rose-100 pt-10">
-          <span>© 2026 PeerLend — Built for people.</span>
+          <span>© 2026 PeerLend — Built for people</span>
           <div className="flex flex-wrap gap-6 mt-6 md:mt-0">
             <Link href="/privacy-policy" className="hover:text-rose-600 transition-colors">Privacy</Link>
             <Link href="/terms-of-service" className="hover:text-rose-600 transition-colors">Terms</Link>
