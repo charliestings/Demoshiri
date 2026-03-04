@@ -16,7 +16,6 @@ import { TransactionsView } from "@/components/dashboard/TransactionsView";
 import { TransactionSuccessModal } from "@/components/dashboard/TransactionSuccessModal";
 import { PinVerificationModal } from "@/components/dashboard/PinVerificationModal";
 import { AlertModal, AlertType } from "@/components/dashboard/AlertModal";
-import { ChatBot } from "@/components/dashboard/ChatBot";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -588,7 +587,7 @@ function DashboardContent() {
                 type={alertConfig.type}
             />
 
-            <ChatBot />
+
         </div>
     );
 }
