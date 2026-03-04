@@ -9,10 +9,9 @@ import { Camera, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from 'lucide-re
 interface KYCCameraCaptureProps {
     onCapture: (imageSrc: string, matchScore: number, livenessVerified: boolean, notes?: string) => void;
     idCardImage?: string | null;
-    showAlert?: (title: string, message: string, type?: any) => void;
 }
 
-export const KYCCameraCapture: React.FC<KYCCameraCaptureProps> = ({ onCapture, idCardImage, showAlert }) => {
+export const KYCCameraCapture: React.FC<KYCCameraCaptureProps> = ({ onCapture, idCardImage }) => {
     const webcamRef = useRef<Webcam>(null);
     const [isModelLoaded, setIsModelLoaded] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
@@ -226,11 +225,7 @@ export const KYCCameraCapture: React.FC<KYCCameraCaptureProps> = ({ onCapture, i
                         <Button
                             onClick={() => {
                                 if (!idCardImage) {
-                                    if (showAlert) {
-                                        showAlert("ID Card Missing", "Please upload your Gov ID (Front) first so we can match it with your selfie.", "warning");
-                                    } else {
-                                        alert("Please upload your Gov ID Front first.");
-                                    }
+                                    alert("Please upload your Gov ID Front first so we can match it with your selfie.");
                                     return;
                                 }
                                 setIsStarted(true);

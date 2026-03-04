@@ -172,17 +172,6 @@
   background: linear-gradient(to right, #f97316, #e11d48, #ec4899);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  
   background-clip: text;
-}
-
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  /* IE and Edge */
-  scrollbar-width: none;
-  /* Firefox */
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-  /* Chrome, Safari and Opera */
 }

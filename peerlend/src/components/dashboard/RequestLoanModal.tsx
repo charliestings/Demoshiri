@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label"; // Need to create or use standard
 import { supabase } from "@/lib/supabaseClient";
 import { Plus, Loader2, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { AlertModal, AlertType } from "./AlertModal";
 
 export function RequestLoanModal({
     userId,
@@ -28,22 +27,7 @@ export function RequestLoanModal({
     const [loading, setLoading] = useState(false);
     const [loanStats, setLoanStats] = useState({ active: 0, repaid: 0 });
     const [fetchingStats, setFetchingStats] = useState(true);
-    const [alertConfig, setAlertConfig] = useState<{
-        open: boolean;
-        title: string;
-        message: string;
-        type: AlertType;
-    }>({
-        open: false,
-        title: "",
-        message: "",
-        type: "info"
-    });
     const router = useRouter();
-
-    const showAlert = (title: string, message: string, type: AlertType = "info") => {
-        setAlertConfig({ open: true, title, message, type });
-    };
 
     const fetchLoanStats = async () => {
         try {
@@ -93,7 +77,7 @@ export function RequestLoanModal({
 
         if (error) {
             console.error("Error creating loan:", error);
-            showAlert("Request Failed", `We could not process your loan request: ${error.message || 'Unknown error'}`, "error");
+            alert(`Failed to create loan request: ${error.message || 'Unknown error'}`);
         } else {
             // Get admin users to notify them
             try {
@@ -262,14 +246,6 @@ export function RequestLoanModal({
                     </form>
                 )}
             </DialogContent>
-
-            <AlertModal
-                isOpen={alertConfig.open}
-                onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
-                title={alertConfig.title}
-                message={alertConfig.message}
-                type={alertConfig.type}
-            />
         </Dialog>
     );
 }

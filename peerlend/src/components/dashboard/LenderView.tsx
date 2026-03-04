@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { formatINR, formatCompactINR } from "@/lib/formatters";
 import { InvestLoanModal } from "./InvestLoanModal";
-import { LoanDetailsModal } from "./LoanDetailsModal";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface LenderViewProps {
@@ -31,10 +30,9 @@ interface LenderViewProps {
     onShowWallet?: () => void;
     onShowSuccess?: (amount: number, purpose: string) => void;
     isLoading?: boolean;
-    hasPin?: boolean;
 }
 
-export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet, onShowSuccess, isLoading = false, hasPin = false }: LenderViewProps) {
+export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet, onShowSuccess, isLoading = false }: LenderViewProps) {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
 
@@ -319,18 +317,11 @@ export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet,
                                             kycStatus={kycStatus}
                                             onShowWallet={onShowWallet}
                                             onShowSuccess={onShowSuccess}
-                                            hasPin={hasPin}
                                         />
                                     </div>
-                                    <LoanDetailsModal
-                                        loan={loan}
-                                        userId={userId}
-                                        onInvested={onInvested}
-                                        kycStatus={kycStatus}
-                                        onShowWallet={onShowWallet}
-                                        onShowSuccess={onShowSuccess}
-                                        hasPin={hasPin}
-                                    />
+                                    <Button variant="outline" size="icon" className="rounded-xl border-slate-100 h-10 w-10 text-slate-400">
+                                        <Info className="h-4 w-4" />
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
