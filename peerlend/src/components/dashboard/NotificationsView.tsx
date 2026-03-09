@@ -133,7 +133,7 @@ export function NotificationsView({ userId }: { userId: string }) {
                             <Bell className="h-10 w-10 text-slate-200" />
                         </div>
                         <h3 className="text-xl font-bold text-slate-800">No notifications yet</h3>
-                        <p className="text-slate-500 mt-2">We'll let you know when something important happens.</p>
+                        <p className="text-slate-500 mt-2">We&apos;ll let you know when something important happens.</p>
                     </CardContent>
                 </Card>
             ) : (

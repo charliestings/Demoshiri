@@ -3,9 +3,8 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { ArrowRight, TrendingUp, ShieldCheck, Zap, CheckCircle, Heart, Sun } from "lucide-react";
+import { ArrowRight, TrendingUp, ShieldCheck, Zap, Heart, Sun } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 
 const fadeUp: any = {
   hidden: { opacity: 0, y: 24 },
@@ -122,7 +121,7 @@ export default function Home() {
                 </div>
               </div>
               <p className="text-xs text-slate-500 font-medium">
-                "Better than my bank, and it feels good to help real people." — <span className="text-rose-600 font-bold">Sarah J.</span>
+                &quot;Better than my bank, and it feels good to help real people.&quot; ΓÇö <span className="text-rose-600 font-bold">Sarah J.</span>
               </p>
             </motion.div>
           </motion.div>

@@ -23,7 +23,6 @@ export default function SignupPage() {
     const [error, setError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
     const [success, setSuccess] = useState(false);
-    const router = useRouter();
 
     // Form Data State
     const [formData, setFormData] = useState({
@@ -205,7 +204,7 @@ export default function SignupPage() {
                                     <button
                                         key={g}
                                         type="button"
-                                        onClick={() => updateField("gender", g as any)}
+                                        onClick={() => updateField("gender", g as "male" | "female" | "other")}
                                         className={`py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${formData.gender === g ? 'bg-rose-500 border-rose-500 text-white shadow-lg shadow-rose-500/20' : 'bg-slate-100/50 border-slate-200 text-slate-500 hover:border-rose-200'}`}
                                     >
                                         {g}
@@ -244,7 +243,7 @@ export default function SignupPage() {
                                     <button
                                         key={r}
                                         type="button"
-                                        onClick={() => updateField("role", r as any)}
+                                        onClick={() => updateField("role", r as "borrower" | "lender")}
                                         className={`py-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${formData.role === r ? 'bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-slate-100/50 border-slate-200 text-slate-500 hover:border-orange-200'}`}
                                     >
                                         {r === "borrower" ? "I want to borrow" : "I want to invest"}
@@ -318,7 +317,7 @@ export default function SignupPage() {
                     </div>
                     <h1 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Verify Email</h1>
                     <p className="text-slate-500 font-medium mb-10 leading-relaxed">
-                        We've sent a verification link to your email. <br />
+                        We&apos;ve sent a verification link to your email. <br />
                         Please check your inbox to activate your account.
                     </p>
                     <Link

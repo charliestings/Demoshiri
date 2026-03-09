@@ -14,20 +14,19 @@ export function OverviewStats({ mode, loans = [], investments = [], kycStatus = 
     const formatPercent = (val: number) => `${Math.round(val)}%`;
 
     const getBorrowerStats = () => {
-        const myLoans = loans.filter(l => l.borrower_id !== undefined); // Simplified for now
-        const fundedLoans = loans.filter(l => l.status === 'funded');
-        const activeRequests = loans.filter(l => l.status === 'pending' || l.status === 'approved');
+        const lifetimeLoans = loans.filter(l => ['funded', 'repaid'].includes(l.status));
+        const activeRequests = loans.filter(l => ['pending', 'approved', 'funded'].includes(l.status));
 
         // Calculate real avg interest
         const totalInterest = activeRequests.reduce((acc, l) => acc + (l.interest_rate || 0), 0);
-        const avgInterest = activeRequests.length > 0 ? totalInterest / activeRequests.length : 10;
+        const avgInterest = activeRequests.length > 0 ? totalInterest / activeRequests.length : 0;
 
         return [
             {
-                label: "Total Borrowed",
-                value: fundedLoans.reduce((acc, l) => acc + (l.amount || 0), 0),
+                label: "Lifetime Borrowed",
+                value: lifetimeLoans.reduce((acc, l) => acc + (l.amount || 0), 0),
                 icon: Wallet,
-                trend: `${fundedLoans.length} Funded`,
+                trend: `${lifetimeLoans.length} Loans`,
                 color: "rose"
             },
             {
@@ -64,7 +63,7 @@ export function OverviewStats({ mode, loans = [], investments = [], kycStatus = 
             const rate = inv.loans?.interest_rate || 0;
             return acc + (rate * (inv.amount || 0));
         }, 0);
-        const weightedAvgRoi = totalInvested > 0 ? totalWeightedInterest / totalInvested : 10;
+        const weightedAvgRoi = totalInvested > 0 ? totalWeightedInterest / totalInvested : 0;
 
         return [
             {

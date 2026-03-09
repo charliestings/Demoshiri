@@ -17,7 +17,7 @@ export default function ContactPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="max-w-3xl mx-auto"
                 >
-                    <span className="text-xs font-bold uppercase tracking-[0.25em] text-orange-500 mb-6 block">We're Here for You</span>
+                    <span className="text-xs font-bold uppercase tracking-[0.25em] text-orange-500 mb-6 block">We&apos;re Here for You</span>
                     <h1 className="text-5xl md:text-7xl font-black text-rose-950 mb-8 font-outfit leading-tight">
                         Get in Touch.
                     </h1>

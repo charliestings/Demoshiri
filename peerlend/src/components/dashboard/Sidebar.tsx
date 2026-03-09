@@ -74,7 +74,7 @@ export function Sidebar({ activeTab, setActiveTab, userRole, isAdmin, userEmail,
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 px-4 space-y-1 py-4 overflow-y-auto">
+            <nav className="flex-1 px-4 space-y-1 py-4 overflow-y-auto scrollbar-hide">
                 {menuItems.map((item) => {
                     const isActive = activeTab === item.id;
                     return (

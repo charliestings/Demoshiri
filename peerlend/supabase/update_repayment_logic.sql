@@ -1,7 +1,7 @@
 -- Migration: Update Repayment Logic to distribute back to investors
+-- Uses auth.uid() so frontend only needs to pass target_loan_id
 
 CREATE OR REPLACE FUNCTION public.process_loan_repayment(
-    borrower_uid UUID,
     target_loan_id UUID
 )
 RETURNS JSONB
@@ -9,6 +9,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
+    borrower_uid UUID := auth.uid();
     loan_record RECORD;
     borrower_balance NUMERIC;
     total_repayment NUMERIC;
@@ -35,7 +36,7 @@ BEGIN
     VALUES (borrower_uid, -total_repayment, 'repayment', 'Repayment for loan: ' || loan_record.purpose, target_loan_id);
 
     -- 5. Distribute Funds to Lenders (Investors)
-    FOR inv IN SELECT * FROM public.investments WHERE loan_id = target_loan_id
+    FOR inv IN (SELECT * FROM public.investments WHERE loan_id = target_loan_id)
     LOOP
         -- Calculate investor's share (Principal + Interest)
         investor_repayment := inv.amount + (inv.amount * (loan_record.interest_rate / 100.0));

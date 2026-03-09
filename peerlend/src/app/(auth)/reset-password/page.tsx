@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
@@ -67,7 +67,7 @@ export default function ResetPasswordPage() {
                     <h1 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Password Reset!</h1>
                     <p className="text-slate-500 font-medium mb-10 leading-relaxed">
                         Your password has been successfully updated. <br />
-                        You'll be redirected to the sign-in page in a moment.
+                        You&apos;ll be redirected to the sign-in page in a moment.
                     </p>
                     <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
                         <div className="h-full bg-green-500 animate-progress w-full origin-left" />

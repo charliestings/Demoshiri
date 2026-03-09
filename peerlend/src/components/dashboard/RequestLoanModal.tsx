@@ -42,7 +42,7 @@ export function RequestLoanModal({
             const repaid = data?.filter(l => l.status === 'repaid').length || 0;
 
             setLoanStats({ active, repaid });
-        } catch (err) {
+        } catch (err: unknown) {
             console.error("Error fetching loan stats:", err);
         } finally {
             setFetchingStats(false);
@@ -60,53 +60,70 @@ export function RequestLoanModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true); // Set loading to true when form is submitted
-        const { error } = await supabase
-            .from("loans")
-            .insert({
-                borrower_id: userId,
-                amount: parseFloat(amount),
-                purpose,
-                duration_months: parseInt(term),
-                interest_rate: 10, // Fixed rate for MVP
-                status: "pending",
-                funded_amount: 0
-            });
+        setLoading(true);
+
+        try {
+            // First, fetch the borrower's name from their profile
+            const { data: profileData, error: profileError } = await supabase
+                .from("profiles")
+                .select("full_name")
+                .eq("id", userId)
+                .single();
+
+            if (profileError) throw profileError;
+
+            // Now insert the loan with the borrower's name
+            const { error: loanError } = await supabase
+                .from("loans")
+                .insert({
+                    borrower_id: userId,
+                    borrower_name: profileData.full_name || "Unknown Borrower",
+                    amount: parseFloat(amount),
+                    purpose,
+                    duration_months: parseInt(term),
+                    interest_rate: 10, // Fixed rate for MVP
+                    status: "pending",
+                    funded_amount: 0
+                });
+
+            if (loanError) throw loanError;
+
+        } catch (error: any) {
+            console.error("Error creating loan:", error);
+            alert(`Failed to create loan request: ${error.message || 'Unknown error'}`);
+            setLoading(false);
+            return; // Stop execution on error
+        }
 
         setLoading(false);
 
-        if (error) {
-            console.error("Error creating loan:", error);
-            alert(`Failed to create loan request: ${error.message || 'Unknown error'}`);
-        } else {
-            // Get admin users to notify them
-            try {
-                const { data: adminProfiles } = await supabase
-                    .from("profiles")
-                    .select("id")
-                    .eq("is_admin", true);
+        // Get admin users to notify them (if loan creation succeeded)
+        try {
+            const { data: adminProfiles } = await supabase
+                .from("profiles")
+                .select("id")
+                .eq("is_admin", true);
 
-                if (adminProfiles && adminProfiles.length > 0) {
-                    const notifications = adminProfiles.map(admin => ({
-                        user_id: admin.id,
-                        title: "New Loan Request",
-                        message: `A new loan request for ₹${amount} (${purpose}) has been submitted.`,
-                        type: "loan_request",
-                        link: "/dashboard?tab=admin"
-                    }));
+            if (adminProfiles && adminProfiles.length > 0) {
+                const notifications = adminProfiles.map(admin => ({
+                    user_id: admin.id,
+                    title: "New Loan Request",
+                    message: `A new loan request for ₹${amount} (${purpose}) has been submitted.`,
+                    type: "loan_request",
+                    link: "/dashboard?tab=admin"
+                }));
 
-                    await supabase.from("notifications").insert(notifications);
-                }
-            } catch (notifyError) {
-                console.error("Error creating admin notifications:", notifyError);
+                await supabase.from("notifications").insert(notifications);
             }
-
-            setOpen(false);
-            setAmount("");
-            setPurpose("");
-            onLoanCreated();
-            router.refresh();
+        } catch (notifyError: unknown) {
+            console.error("Error creating admin notifications:", notifyError);
         }
+
+        setOpen(false);
+        setAmount("");
+        setPurpose("");
+        onLoanCreated();
+        router.refresh();
     };
 
     return (
@@ -204,7 +221,7 @@ export function RequestLoanModal({
                             <label htmlFor="purpose" className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loan Purpose</label>
                             <input
                                 id="purpose"
-                                placeholder="What will you use this for?"
+                                placeholder="What will you use this for? (e.g. Tuition fees)"
                                 className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-slate-900 font-bold placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/20 transition-all"
                                 value={purpose}
                                 onChange={(e) => setPurpose(e.target.value)}

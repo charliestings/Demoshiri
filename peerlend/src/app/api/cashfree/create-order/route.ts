@@ -62,8 +62,9 @@ export async function POST(req: Request) {
             order_id: data.order_id
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Create Order API Error:', error);
-        return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Internal server error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

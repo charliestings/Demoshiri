@@ -105,9 +105,9 @@ export function PinVerificationModal({
                 setPin(new Array(6).fill(""));
                 inputRefs.current[0]?.focus();
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("PIN verification error:", err);
-            setError(err.message || "An error occurred during verification");
+            setError(err instanceof Error ? err.message : "An error occurred during verification");
         } finally {
             setLoading(false);
         }

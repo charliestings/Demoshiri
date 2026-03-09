@@ -101,7 +101,7 @@ export async function POST(req: Request) {
             }
 
             // 2. Execute the deposit using the user's authenticated context so auth.uid() works
-            const { data: depositData, error: depositError } = await supabaseClient.rpc('deposit_funds', {
+            const { error: depositError } = await supabaseClient.rpc('deposit_funds', {
                 amount_to_add: amount
             });
 
@@ -115,8 +115,9 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, message: `Payment status is ${data.order_status}` });
         }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Verify Order API Error:', error);
-        return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Internal server error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

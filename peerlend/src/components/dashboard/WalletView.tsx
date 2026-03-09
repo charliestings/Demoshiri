@@ -1,36 +1,46 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import {
     Wallet,
     ArrowUpCircle,
     ArrowDownCircle,
-    History,
     Plus,
     Loader2,
     TrendingUp,
     DollarSign,
-    ArrowRightLeft,
-    CheckCircle2,
-    Clock,
-    ShieldAlert
+    ShieldAlert,
+    Landmark,
+    Trash2,
+    CheckCircle2
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { Transaction } from "@/types";
 import { formatINR } from "@/lib/formatters";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TransactionSuccessModal } from "./TransactionSuccessModal";
 
 interface WalletViewProps {
     userId: string;
 }
 
+export interface BankAccount {
+    id: string;
+    account_holder_name: string;
+    account_number: string;
+    ifsc_code: string;
+    bank_name: string;
+    is_primary: boolean;
+}
+
 export function WalletView({ userId }: WalletViewProps) {
     const [balance, setBalance] = useState<number | null>(null);
-    const [transactions, setTransactions] = useState<any[]>([]);
+    const [, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [depositAmount, setDepositAmount] = useState("");
     const [depositing, setDepositing] = useState(false);
@@ -39,6 +49,23 @@ export function WalletView({ userId }: WalletViewProps) {
     const [withdrawing, setWithdrawing] = useState(false);
     const [showWithdrawModal, setShowWithdrawModal] = useState(false);
     const [kycStatus, setKycStatus] = useState<string>('not_started');
+    const [showDepositSuccess, setShowDepositSuccess] = useState(false);
+    const [lastDepositAmount, setLastDepositAmount] = useState(0);
+
+    // Bank Accounts State
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [loadingAccounts, setLoadingAccounts] = useState(true);
+    const [showAddBankModal, setShowAddBankModal] = useState(false);
+    const [addingBank, setAddingBank] = useState(false);
+    const [newBank, setNewBank] = useState({
+        account_holder_name: "",
+        account_number: "",
+        ifsc_code: "",
+        bank_name: ""
+    });
+
+    // Withdrawal State
+    const [selectedBankId, setSelectedBankId] = useState<string>("");
 
     const fetchWalletData = useCallback(async () => {
         try {
@@ -84,6 +111,69 @@ export function WalletView({ userId }: WalletViewProps) {
         fetchWalletData();
     }, [fetchWalletData]);
 
+    const fetchBankAccounts = useCallback(async () => {
+        setLoadingAccounts(true);
+        try {
+            const { data, error } = await supabase
+                .from("bank_accounts")
+                .select("*")
+                .eq("user_id", userId)
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+            setBankAccounts(data || []);
+        } catch (error) {
+            console.error("Error fetching bank accounts:", error);
+        } finally {
+            setLoadingAccounts(false);
+        }
+    }, [userId]);
+
+    useEffect(() => {
+        fetchBankAccounts();
+    }, [fetchBankAccounts]);
+
+    // Restoration: Auto-verify on redirect
+    useEffect(() => {
+        const queryParams = new URLSearchParams(window.location.search);
+        const orderId = queryParams.get('order_id');
+
+        if (orderId) {
+            const verifyPayment = async () => {
+                setLoading(true);
+                try {
+                    // Get the current session token for authenticated verification
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const token = session?.access_token;
+
+                    const response = await fetch('/api/cashfree/verify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                        },
+                        body: JSON.stringify({ order_id: orderId, user_id: userId })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        setLastDepositAmount(result.amount || 0);
+                        setShowDepositSuccess(true);
+                        fetchWalletData();
+                        // Clean up URL
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    } else {
+                        console.warn("Verification result:", result);
+                    }
+                } catch (error) {
+                    console.error("Verification error:", error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            verifyPayment();
+        }
+    }, [fetchWalletData]);
+
     const handleDeposit = async (e: React.FormEvent) => {
         e.preventDefault();
         const amount = parseFloat(depositAmount);
@@ -91,24 +181,33 @@ export function WalletView({ userId }: WalletViewProps) {
 
         setDepositing(true);
         try {
-            const { data, error } = await supabase.rpc('deposit_funds', {
-                amount_to_add: amount
+            // 1. Create Order via our API
+            const response = await fetch('/api/cashfree/create-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount, userId })
             });
 
-            if (error) throw error;
+            const data: { payment_session_id?: string; order_id?: string } = await response.json();
+            const { payment_session_id } = data;
 
-            setDepositAmount("");
-            setShowDepositModal(false);
-            fetchWalletData();
-        } catch (error: any) {
+            if (!payment_session_id) throw new Error("Could not create payment session");
+
+            // 2. Load SDK dynamically
+            const { load } = await import('@cashfreepayments/cashfree-js');
+            const cashfree = await load({ mode: 'sandbox' }); // Using sandbox as per implementation
+
+            // 3. Open Checkout
+            const checkoutOptions = {
+                paymentSessionId: payment_session_id,
+                returnUrl: `${window.location.origin}/dashboard?tab=wallet&order_id=${data.order_id}`,
+            };
+
+            await cashfree.checkout(checkoutOptions);
+
+        } catch (error: unknown) {
             console.error("Deposit error:", error);
-
-            // Check if it's the specific KYC error we added to Supabase
-            if (error?.message?.includes('KYC verification')) {
-                alert("You must complete your KYC verification before you can add funds to your wallet.");
-            } else {
-                alert("Failed to deposit funds: " + (error?.message || "Please make sure your KYC is approved."));
-            }
+            alert("Failed to initiate deposit: " + (error instanceof Error ? error.message : "Unknown error"));
         } finally {
             setDepositing(false);
         }
@@ -124,38 +223,80 @@ export function WalletView({ userId }: WalletViewProps) {
             return;
         }
 
+        if (!selectedBankId) {
+            alert("Please select a bank account for withdrawal");
+            return;
+        }
+
         setWithdrawing(true);
         try {
-            const { data, error } = await supabase.rpc('process_wallet_transaction', {
+            const { error } = await supabase.rpc('process_wallet_transaction', {
                 target_uid: userId,
                 transaction_amount: amount,
                 transaction_type: 'withdrawal',
-                transaction_desc: 'Funds withdrawn from wallet'
+                transaction_desc: 'Funds withdrawn to bank account'
             });
 
             if (error) throw error;
 
             setWithdrawAmount("");
+            setSelectedBankId("");
             setShowWithdrawModal(false);
             fetchWalletData();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Withdrawal error:", error);
-            alert("Failed to withdraw funds: " + (error.message || "Unknown error"));
+            alert("Failed to withdraw funds: " + (error instanceof Error ? error.message : "Unknown error"));
         } finally {
             setWithdrawing(false);
         }
     };
 
-    const getTransactionIcon = (type: string) => {
-        switch (type) {
-            case 'deposit': return <Plus className="h-4 w-4 text-emerald-500" />;
-            case 'withdrawal': return <ArrowDownCircle className="h-4 w-4 text-rose-500" />;
-            case 'investment': return <TrendingUp className="h-4 w-4 text-orange-500" />;
-            case 'loan_disbursement': return <DollarSign className="h-4 w-4 text-blue-500" />;
-            case 'repayment': return <CheckCircle2 className="h-4 w-4 text-purple-600" />;
-            default: return <ArrowRightLeft className="h-4 w-4 text-slate-400" />;
+    const handleAddBankAccount = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setAddingBank(true);
+        try {
+            const response = await fetch('/api/bank-accounts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: userId,
+                    account_holder_name: newBank.account_holder_name,
+                    account_number: newBank.account_number,
+                    ifsc_code: newBank.ifsc_code,
+                    bank_name: newBank.bank_name,
+                    is_primary: bankAccounts.length === 0 // Make primary if it's the first one
+                })
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error || "Failed to add bank account");
+            }
+
+            setNewBank({ account_holder_name: "", account_number: "", ifsc_code: "", bank_name: "" });
+            setShowAddBankModal(false);
+            fetchBankAccounts();
+        } catch (error: any) {
+            console.error("Add Bank Error:", error);
+            alert(error.message || "Unknown error occurred while adding bank account.");
+        } finally {
+            setAddingBank(false);
         }
     };
+
+    const handleDeleteBankAccount = async (id: string) => {
+        if (!confirm("Are you sure you want to remove this bank account?")) return;
+        try {
+            const { error } = await supabase.from("bank_accounts").delete().eq("id", id);
+            if (error) throw error;
+            fetchBankAccounts();
+        } catch (error) {
+            console.error("Error deleting bank account:", error);
+        }
+    };
+
+    // Removed unused getTransactionIcon
 
     if (loading) {
         return (
@@ -292,9 +433,44 @@ export function WalletView({ userId }: WalletViewProps) {
                                             </div>
                                         </div>
                                     </div>
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Bank Account</label>
+                                        {bankAccounts.length > 0 ? (
+                                            <div className="grid gap-2">
+                                                {bankAccounts.map(bank => (
+                                                    <div
+                                                        key={bank.id}
+                                                        onClick={() => setSelectedBankId(bank.id)}
+                                                        className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${selectedBankId === bank.id
+                                                            ? 'border-orange-500 bg-orange-50/50'
+                                                            : 'border-slate-100 hover:border-slate-300'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${selectedBankId === bank.id ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                                <Landmark className="h-5 w-5" />
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-bold text-slate-900">{bank.bank_name}</h4>
+                                                                <p className="text-xs text-slate-500">****{bank.account_number.slice(-4)}</p>
+                                                            </div>
+                                                        </div>
+                                                        {selectedBankId === bank.id && <CheckCircle2 className="h-5 w-5 text-orange-500" />}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="p-4 rounded-2xl border border-dashed border-slate-200 text-center">
+                                                <p className="text-xs text-slate-500 mb-2">No bank accounts linked.</p>
+                                                <Button type="button" variant="outline" size="sm" onClick={() => { setShowWithdrawModal(false); setShowAddBankModal(true); }} className="h-8 text-xs font-bold rounded-xl">
+                                                    Add Bank Account
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
                                     <Button
                                         type="submit"
-                                        disabled={withdrawing}
+                                        disabled={withdrawing || bankAccounts.length === 0 || !selectedBankId}
                                         className="w-full bg-slate-900 hover:bg-black text-white h-16 rounded-2xl font-black uppercase tracking-widest transition-all hover:scale-[1.02]"
                                     >
                                         {withdrawing ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : "Confirm Withdrawal"}
@@ -304,6 +480,137 @@ export function WalletView({ userId }: WalletViewProps) {
                         </Dialog>
                     </div>
                 </div>
+            </motion.div>
+
+            {/* Bank Accounts Section */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+            >
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight">Linked Bank Accounts</h3>
+                    <Dialog open={showAddBankModal} onOpenChange={setShowAddBankModal}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" className="rounded-xl font-bold text-xs h-9 border-slate-200">
+                                <Plus className="h-4 w-4 mr-1" /> Add Bank
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md !bg-white rounded-3xl border-none p-0 overflow-hidden shadow-2xl">
+                            <div className="p-8 pb-4">
+                                <DialogHeader>
+                                    <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">Add Bank Account</DialogTitle>
+                                    <DialogDescription className="text-slate-500 font-medium">
+                                        Link your bank account for secure withdrawals.
+                                    </DialogDescription>
+                                </DialogHeader>
+                            </div>
+                            <form onSubmit={handleAddBankAccount} className="p-8 pt-4 space-y-4">
+                                <div className="space-y-4">
+                                    <div className="grid gap-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Account Holder Name</label>
+                                        <Input
+                                            placeholder="John Doe"
+                                            className="rounded-xl border-slate-200 bg-white h-12 focus:ring-2 focus:ring-slate-900"
+                                            value={newBank.account_holder_name}
+                                            onChange={(e) => setNewBank({ ...newBank, account_holder_name: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bank Name</label>
+                                        <Input
+                                            placeholder="e.g. HDFC Bank, SBI"
+                                            className="rounded-xl border-slate-200 bg-white h-12 focus:ring-2 focus:ring-slate-900"
+                                            value={newBank.bank_name}
+                                            onChange={(e) => setNewBank({ ...newBank, bank_name: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Account Number</label>
+                                            <Input
+                                                placeholder="0000 0000 0000"
+                                                className="rounded-xl border-slate-200 bg-white h-12 focus:ring-2 focus:ring-slate-900"
+                                                value={newBank.account_number}
+                                                onChange={(e) => setNewBank({ ...newBank, account_number: e.target.value })}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">IFSC Code</label>
+                                            <Input
+                                                placeholder="SBIN0001234"
+                                                className="rounded-xl border-slate-200 bg-white h-12 focus:ring-2 focus:ring-slate-900 uppercase"
+                                                value={newBank.ifsc_code}
+                                                onChange={(e) => setNewBank({ ...newBank, ifsc_code: e.target.value })}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <Button
+                                    type="submit"
+                                    disabled={addingBank}
+                                    className="w-full bg-slate-900 hover:bg-black text-white h-14 rounded-xl font-bold mt-4"
+                                >
+                                    {addingBank ? <Loader2 className="h-5 w-5 animate-spin mx-auto" /> : "Link Bank Account"}
+                                </Button>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+
+                {loadingAccounts ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Skeleton className="h-24 w-full rounded-2xl" />
+                        <Skeleton className="h-24 w-full rounded-2xl" />
+                    </div>
+                ) : bankAccounts.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {bankAccounts.map((bank) => (
+                            <Card key={bank.id} className="rounded-2xl border-slate-100 shadow-sm overflow-hidden group">
+                                <CardContent className="p-5 flex items-start justify-between">
+                                    <div className="flex gap-4">
+                                        <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-all">
+                                            <Landmark className="h-6 w-6" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-900">{bank.bank_name}</h4>
+                                            <p className="text-xs text-slate-500 font-medium tracking-widest">**** **** {bank.account_number.slice(-4)}</p>
+                                            <div className="mt-1 flex items-center gap-2">
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">{bank.ifsc_code}</span>
+                                                {bank.is_primary && (
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600">Primary</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                        onClick={() => handleDeleteBankAccount(bank.id)}
+                                        title="Remove Account"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                ) : (
+                    <Card className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
+                        <CardContent className="p-8 text-center flex flex-col items-center">
+                            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                                <Landmark className="h-6 w-6" />
+                            </div>
+                            <h4 className="font-bold text-slate-900 mb-1">No Bank Accounts Linked</h4>
+                            <p className="text-sm text-slate-500 max-w-sm">Link a bank account securely to withdraw your funds when needed.</p>
+                        </CardContent>
+                    </Card>
+                )}
             </motion.div>
 
             {/* Quick Actions / Stats */}
@@ -329,6 +636,15 @@ export function WalletView({ userId }: WalletViewProps) {
             </div>
 
 
+
+            <TransactionSuccessModal
+                isOpen={showDepositSuccess}
+                onClose={() => setShowDepositSuccess(false)}
+                title="Wallet Funded!"
+                amount={lastDepositAmount}
+                description={`₹${lastDepositAmount.toLocaleString('en-IN')} has been added to your wallet successfully.`}
+                onViewWallet={() => setShowDepositSuccess(false)}
+            />
         </div>
     );
 }

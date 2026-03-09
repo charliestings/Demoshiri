@@ -31,6 +31,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { ChatBot } from "@/components/dashboard/ChatBot";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -39,9 +41,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${spaceGrotesk.variable} ${inter.variable} ${outfit.variable} ${playfair.variable} antialiased bg-background text-foreground min-h-screen font-inter`}
+        className={`${spaceGrotesk.variable} ${inter.variable} ${outfit.variable} ${playfair.variable} antialiased bg-background text-foreground min-h-screen font-inter overflow-x-hidden`}
       >
         {children}
+        <ChatBot />
       </body>
     </html>
   );

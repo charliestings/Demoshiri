@@ -27,16 +27,16 @@ export async function POST(req: Request) {
         // 2. Initialize the Gemini AI SDK
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
-            model: "gemini-flash-latest",
+            model: "gemini-2.5-flash",
             systemInstruction: SYSTEM_PROMPT
         });
 
-        const formattedHistory = (history || []).map((h: any) => ({
+        const formattedHistory = (history || []).map((h: { role: string; content: string }) => ({
             role: h.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: h.content }]
         }));
 
-        let validHistory: any[] = [];
+        const validHistory: { role: string; parts: { text: string }[] }[] = [];
         for (const msg of formattedHistory) {
             if (validHistory.length === 0) {
                 if (msg.role === 'model') {
@@ -62,11 +62,12 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ reply: text });
 
-    } catch (error: any) {
-        console.error('PeerLend AI Final Error:', error.message);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Failed to process chat message";
+        console.error('PeerLend AI Final Error:', message);
         return NextResponse.json({
             error: 'Failed to process chat message',
-            details: error.message
+            details: message
         }, { status: 500 });
     }
 }

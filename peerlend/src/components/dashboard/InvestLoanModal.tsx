@@ -4,18 +4,21 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
-import { Loader2, DollarSign, Wallet } from "lucide-react";
+import { Loader2, DollarSign } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { formatINR } from "@/lib/formatters";
-import { TransactionSuccessModal } from "./TransactionSuccessModal";
+
+import { Loan } from "@/types";
 
 interface InvestLoanModalProps {
-    loan: any;
+    loan: Loan;
     userId: string;
     onInvested: () => void;
     kycStatus?: string;
     onShowWallet?: () => void;
     onShowSuccess?: (amount: number, purpose: string) => void;
+    hasPin?: boolean;
+    onInvestClick?: (loan: Loan, amount: number) => void;
 }
 
 export function InvestLoanModal({
@@ -23,8 +26,8 @@ export function InvestLoanModal({
     userId,
     onInvested,
     kycStatus,
-    onShowWallet,
-    onShowSuccess
+    onShowSuccess,
+    onInvestClick
 }: InvestLoanModalProps) {
     const [open, setOpen] = useState(false);
     const [amount, setAmount] = useState("");
@@ -37,6 +40,12 @@ export function InvestLoanModal({
 
         if (isNaN(investAmount) || investAmount <= 0) {
             alert("Please enter a valid amount");
+            return;
+        }
+
+        if (onInvestClick) {
+            setOpen(false);
+            onInvestClick(loan, investAmount);
             return;
         }
 
@@ -77,9 +86,9 @@ export function InvestLoanModal({
             onInvested();
             router.refresh();
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Error investing:", error);
-            alert("Failed to process investment: " + (error.message || "Unknown error"));
+            alert("Failed to process investment: " + (error instanceof Error ? error.message : "Unknown error"));
         } finally {
             setLoading(false);
         }

@@ -4,9 +4,8 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { OverviewStats } from "@/components/dashboard/OverviewStats";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { RequestLoanModal } from "@/components/dashboard/RequestLoanModal";
-import { InvestLoanModal } from "@/components/dashboard/InvestLoanModal"; // Import once
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { SettingsView } from "@/components/dashboard/SettingsView";
 import { NotificationsView } from "@/components/dashboard/NotificationsView";
@@ -14,26 +13,60 @@ import { LenderView } from "@/components/dashboard/LenderView";
 import { WalletView } from "@/components/dashboard/WalletView";
 import { TransactionsView } from "@/components/dashboard/TransactionsView";
 import { TransactionSuccessModal } from "@/components/dashboard/TransactionSuccessModal";
+import { PinVerificationModal } from "@/components/dashboard/PinVerificationModal";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    Filter,
     Loader2,
-    ArrowUpRight,
-    Search,
-    Activity,
-    Briefcase,
-    Info,
+    ShieldCheck,
+    Shield,
+    Wallet,
+    CheckCircle2,
     TrendingUp,
     Zap,
-    ShieldCheck,
-    Wallet,
-    Shield,
-    CheckCircle2
+    Info
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter, useSearchParams } from "next/navigation";
-import { formatINR, formatCompactINR } from "@/lib/formatters";
+import { formatINR } from "@/lib/formatters";
+
+interface Profile {
+    id: string;
+    full_name: string;
+    email?: string;
+    is_admin: boolean;
+    kyc_status: string;
+    kyc_match_score?: number;
+    kyc_liveness_verified?: boolean;
+    kyc_documents?: Record<string, string | null>;
+    kyc_submitted_at?: string;
+    created_at?: string;
+    pan_number?: string;
+    aadhar_number?: string;
+    city?: string;
+    monthly_income?: number;
+}
+
+interface Loan {
+    id: string;
+    borrower_id: string;
+    purpose: string;
+    amount: number;
+    interest_rate: number;
+    duration_months: number;
+    status: string;
+    funded_amount?: number;
+    profiles?: Profile;
+    created_at?: string;
+}
+
+interface Investment {
+    id: string;
+    investor_id: string;
+    loan_id: string;
+    amount: number;
+    loans?: Loan;
+}
 
 export default function DashboardPage() {
     return (
@@ -51,17 +84,27 @@ function DashboardContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "overview");
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
     const [role, setRole] = useState<"borrower" | "lender">("borrower");
     const [isAdmin, setIsAdmin] = useState(false);
     const [kycStatus, setKycStatus] = useState<string>("none");
     const [loading, setLoading] = useState(true);
-    const [loans, setLoans] = useState<any[]>([]);
-    const [investments, setInvestments] = useState<any[]>([]);
-    const [pendingKYCUsers, setPendingKYCUsers] = useState<any[]>([]);
+    const [loans, setLoans] = useState<Loan[]>([]);
+    const [investments, setInvestments] = useState<Investment[]>([]);
+    const [pendingKYCUsers, setPendingKYCUsers] = useState<Profile[]>([]);
     const [unreadNotifications, setUnreadNotifications] = useState(0);
     const [showRepaySuccess, setShowRepaySuccess] = useState(false);
+    const [lastRepayAmount, setLastRepayAmount] = useState(0);
+    const [lastRepayPurpose, setLastRepayPurpose] = useState("");
+    const [showInvestSuccess, setShowInvestSuccess] = useState(false);
+    const [lastInvestAmount, setLastInvestAmount] = useState(0);
     const [lastInvestPurpose, setLastInvestPurpose] = useState("");
+
+    // Restoration: PIN Security States
+    const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+    const [pinPurpose, setPinPurpose] = useState<"investment" | "repayment">("investment");
+    const [pinAction, setPinAction] = useState<() => Promise<void>>(() => async () => { });
+    const [, setLoanToRepay] = useState<Loan | null>(null);
 
     const fetchNotificationsCount = useCallback(async () => {
         if (!user) return;
@@ -82,6 +125,10 @@ function DashboardContent() {
             setUnreadNotifications(count || 0);
         }
     }, [user]);
+
+    useEffect(() => {
+        fetchNotificationsCount();
+    }, [fetchNotificationsCount]);
 
     const fetchData = useCallback(async () => {
         if (!user) return;
@@ -207,14 +254,14 @@ function DashboardContent() {
             setUser(session.user);
 
             // Fetch profile to get role and admin status
-            let { data: profile, error: profileError } = await supabase
+            let { data: profile } = await supabase
                 .from("profiles")
                 .select("id, full_name, is_admin, kyc_status")
                 .eq("id", session.user.id)
                 .single();
 
             // If profile doesn't exist, create a default one
-            if (profileError && profileError.code === 'PGRST116') {
+            if (!profile) {
                 const { data: newProfile, error: createError } = await supabase
                     .from("profiles")
                     .insert({
@@ -225,8 +272,11 @@ function DashboardContent() {
                     .select()
                     .single();
 
-                if (!createError) profile = newProfile;
-                else console.error("Error creating profile:", createError);
+                if (!createError && newProfile) {
+                    profile = newProfile;
+                } else if (createError) {
+                    console.error("Error creating profile:", createError);
+                }
             }
 
             if (profile) {
@@ -245,11 +295,13 @@ function DashboardContent() {
     useEffect(() => {
         const tab = searchParams.get("tab");
         if (tab && ["overview", "market", "loans", "transactions", "admin", "settings", "notifications", "wallet"].includes(tab)) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setActiveTab(tab);
         }
     }, [searchParams]);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchData();
         fetchNotificationsCount();
     }, [fetchData, fetchNotificationsCount]);
@@ -290,7 +342,7 @@ function DashboardContent() {
                         <h1 className="text-4xl font-black tracking-tight neon-text uppercase leading-none">
                             {activeTab === "market" ? "Explore Loans" : activeTab.replace("-", " ")}
                         </h1>
-                        <p className="text-slate-500 font-medium mt-1">Hello, {user?.email?.split('@')[0] || 'User'}. Managing your {role} portfolio.</p>
+                        <p className="text-slate-500 font-medium mt-1">Hello, <span className="text-rose-600 font-bold capitalize">{user?.email?.split('@')[0] || 'User'}</span>. Managing your {role} portfolio.</p>
                     </div>
                     {/* Global actions */}
                     <div className="flex items-center gap-4">
@@ -343,7 +395,7 @@ function DashboardContent() {
                                 <div className="space-y-8">
                                     <OverviewStats
                                         mode={isAdmin ? 'lender' : role}
-                                        loans={loans}
+                                        loans={role === 'borrower' ? loans.filter(l => l.borrower_id === user.id) : loans}
                                         investments={investments}
                                         kycStatus={kycStatus}
                                     />
@@ -357,11 +409,36 @@ function DashboardContent() {
                                                 userId={user.id}
                                                 onLoanCreated={fetchData}
                                                 kycStatus={kycStatus}
+                                                userProfile={user}
                                                 onShowWallet={() => setActiveTab("wallet")}
-                                                onShowRepaySuccess={(amt, purpose) => {
+                                                onShowRepaySuccess={(amt: number, purpose: string) => {
                                                     setLastRepayAmount(amt);
                                                     setLastRepayPurpose(purpose);
                                                     setShowRepaySuccess(true);
+                                                }}
+                                                onRepayClick={(loan) => {
+                                                    setLoanToRepay(loan);
+                                                    setPinPurpose("repayment");
+                                                    setPinAction(() => async () => {
+                                                        // Handle successful PIN verification
+                                                        if (!loan) return;
+                                                        const repaymentAmount = loan.amount + (loan.amount * (loan.interest_rate / 100));
+                                                        try {
+                                                            const { error: repayError } = await supabase.rpc('process_loan_repayment', {
+                                                                borrower_uid: user.id,
+                                                                target_loan_id: loan.id
+                                                            });
+                                                            if (repayError) throw new Error(repayError.message || 'Repayment failed');
+                                                            setLastRepayAmount(repaymentAmount);
+                                                            setLastRepayPurpose(loan.purpose);
+                                                            setShowRepaySuccess(true);
+                                                            fetchData();
+                                                        } catch (err: unknown) {
+                                                            console.error("Repayment error:", err);
+                                                            alert("Repayment failed: " + (err instanceof Error ? err.message : "Unknown error"));
+                                                        }
+                                                    });
+                                                    setIsPinModalOpen(true);
                                                 }}
                                             />
                                         ) : isAdmin ? (
@@ -372,7 +449,34 @@ function DashboardContent() {
                                                 onKYCUpdate={handleKYCUpdate}
                                             />
                                         ) : (
-                                            <LenderView loans={loans.filter(l => l.status === 'approved' && l.borrower_id !== user.id).slice(0, 3)} userId={user.id} onInvested={fetchData} kycStatus={kycStatus} onShowWallet={() => setActiveTab("wallet")} />
+                                            <LenderView
+                                                loans={loans.filter(l => l.status === 'approved' && l.borrower_id !== user.id).slice(0, 3)}
+                                                userId={user.id}
+                                                onInvested={fetchData}
+                                                kycStatus={kycStatus}
+                                                onShowWallet={() => setActiveTab("wallet")}
+                                                onInvestClick={(loan, amount) => {
+                                                    setPinPurpose("investment");
+                                                    setPinAction(() => async () => {
+                                                        try {
+                                                            const { data, error: investError } = await supabase.rpc('process_loan_investment', {
+                                                                investor_uid: user.id,
+                                                                target_loan_id: loan.id,
+                                                                invest_amount: amount
+                                                            });
+                                                            if (investError) throw new Error(investError.message || 'Investment failed');
+                                                            setShowInvestSuccess(true);
+                                                            setLastInvestAmount(amount);
+                                                            setLastInvestPurpose(loan.purpose);
+                                                            fetchData();
+                                                        } catch (err: unknown) {
+                                                            console.error("Investment error:", err);
+                                                            alert("Investment failed: " + (err instanceof Error ? err.message : "Unknown error"));
+                                                        }
+                                                    });
+                                                    setIsPinModalOpen(true);
+                                                }}
+                                            />
                                         )}
                                     </div>
                                 </div>
@@ -384,11 +488,35 @@ function DashboardContent() {
                                     userId={user.id}
                                     onLoanCreated={fetchData}
                                     kycStatus={kycStatus}
+                                    userProfile={user}
                                     onShowWallet={() => setActiveTab("wallet")}
-                                    onShowRepaySuccess={(amt, purpose) => {
+                                    onShowRepaySuccess={(amt: number, purpose: string) => {
                                         setLastRepayAmount(amt);
                                         setLastRepayPurpose(purpose);
                                         setShowRepaySuccess(true);
+                                    }}
+                                    onRepayClick={(loan) => {
+                                        setLoanToRepay(loan);
+                                        setPinPurpose("repayment");
+                                        setPinAction(() => async () => {
+                                            if (!loan) return;
+                                            const repaymentAmount = loan.amount + (loan.amount * (loan.interest_rate / 100));
+                                            try {
+                                                const { error: repayError } = await supabase.rpc('process_loan_repayment', {
+                                                    borrower_uid: user.id,
+                                                    target_loan_id: loan.id
+                                                });
+                                                if (repayError) throw new Error(repayError.message || 'Repayment failed');
+                                                setShowRepaySuccess(true);
+                                                setLastRepayAmount(repaymentAmount);
+                                                setLastRepayPurpose(loan.purpose);
+                                                fetchData();
+                                            } catch (err: unknown) {
+                                                console.error("Repayment error:", err);
+                                                alert("Repayment failed: " + (err instanceof Error ? err.message : "Unknown error"));
+                                            }
+                                        });
+                                        setIsPinModalOpen(true);
                                     }}
                                 />
                             )}
@@ -408,6 +536,28 @@ function DashboardContent() {
                                         setLastInvestAmount(amt);
                                         setLastInvestPurpose(purpose);
                                         setShowInvestSuccess(true);
+                                    }}
+                                    onInvestClick={(loan, amount) => {
+                                        setPinPurpose("investment");
+                                        setPinAction(() => async () => {
+                                            try {
+                                                const { data, error: investError } = await supabase.rpc('process_loan_investment', {
+                                                    investor_uid: user.id,
+                                                    target_loan_id: loan.id,
+                                                    invest_amount: amount
+                                                });
+                                                if (investError) throw investError;
+                                                setShowInvestSuccess(true);
+                                                setLastInvestAmount(amount);
+                                                setLastInvestPurpose(loan.purpose);
+                                                fetchData();
+                                            } catch (err: unknown) {
+                                                console.error("Investment error:", err);
+                                                const errorMessage = err instanceof Error ? err.message : "Unknown error";
+                                                alert("Investment failed: " + errorMessage);
+                                            }
+                                        });
+                                        setIsPinModalOpen(true);
                                     }}
                                 />
                             )}
@@ -455,13 +605,25 @@ function DashboardContent() {
                 description={`Your investment in "${lastInvestPurpose}" has been processed.`}
                 onViewWallet={() => setActiveTab("wallet")}
             />
+
+            <PinVerificationModal
+                isOpen={isPinModalOpen}
+                onClose={() => setIsPinModalOpen(false)}
+                onSuccess={async () => {
+                    setIsPinModalOpen(false);
+                    await pinAction();
+                }}
+                title={pinPurpose === "investment" ? "Authorize Investment" : "Authorize Repayment"}
+                description={`Enter your 6-digit transaction PIN to confirm this ${pinPurpose}.`}
+                actionLabel={pinPurpose === "investment" ? "Confirm Investment" : "Confirm Repayment"}
+            />
         </div>
     );
 }
 
-function BorrowerProfileModal({ profile, loan, onApprove, onReject }: { profile: any, loan: any, onApprove: () => void, onReject: () => void }) {
+function BorrowerProfileModal({ profile, loan, onApprove, onReject }: { profile: Profile, loan: Loan, onApprove: () => void, onReject: () => void }) {
     const [open, setOpen] = useState(false);
-    const [stats, setStats] = useState<any>(null);
+    const [stats, setStats] = useState<{ totalRequests: number, totalBorrowed: number, successRate: number, memberSince: string } | null>(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -496,7 +658,6 @@ function BorrowerProfileModal({ profile, loan, onApprove, onReject }: { profile:
     const aiScore = profile?.kyc_match_score || 0;
     const isLivenessVerified = profile?.kyc_liveness_verified || false;
     const kycStatus = profile?.kyc_status || 'none';
-    const aiNotes = profile?.kyc_documents?.ai_notes || "No diagnostic notes available.";
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -521,11 +682,11 @@ function BorrowerProfileModal({ profile, loan, onApprove, onReject }: { profile:
                             <div className="p-5 rounded-2xl bg-orange-50/50 border border-orange-100 shadow-sm">
                                 <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">AI Trust Score</p>
                                 <div className="flex items-baseline gap-2">
-                                    <p className="text-4xl font-black text-slate-900">{aiScore}%</p>
+                                    <p className="text-4xl font-black text-slate-900">{(aiScore ?? 0)}%</p>
                                     <p className="text-[10px] font-bold text-slate-400">Match Accuracy</p>
                                 </div>
                                 <div className="w-full bg-orange-200/50 h-2 rounded-full mt-3 overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all duration-1000 ${aiScore >= 80 ? 'bg-emerald-500' : aiScore >= 50 ? 'bg-orange-500' : 'bg-rose-500'}`} style={{ width: `${aiScore}%` }} />
+                                    <div className={`h-full rounded-full transition-all duration-1000 ${(aiScore ?? 0) >= 80 ? 'bg-emerald-500' : (aiScore ?? 0) >= 50 ? 'bg-orange-500' : 'bg-rose-500'}`} style={{ width: `${(aiScore ?? 0)}%` }} />
                                 </div>
                             </div>
 
@@ -613,16 +774,15 @@ function BorrowerProfileModal({ profile, loan, onApprove, onReject }: { profile:
     );
 }
 
-function KYCReviewModal({ user, onApprove, onReject }: { user: any, onApprove: () => void, onReject: (reason: string) => void }) {
+function KYCReviewModal({ user, onApprove, onReject }: { user: Profile, onApprove: () => void, onReject: (reason: string) => void }) {
     const [open, setOpen] = useState(false);
     const [rejectionReason, setRejectionReason] = useState("");
     const [showRejectInput, setShowRejectInput] = useState(false);
     const [signedUrls, setSignedUrls] = useState<{ [key: string]: string }>({});
     const [isFetchingUrls, setIsFetchingUrls] = useState(false);
 
-    const docs = user.kyc_documents || {};
-
     useEffect(() => {
+        const docs = user.kyc_documents || {};
         if (open && Object.keys(docs).length > 0) {
             const fetchSignedUrls = async () => {
                 setIsFetchingUrls(true);
@@ -653,7 +813,7 @@ function KYCReviewModal({ user, onApprove, onReject }: { user: any, onApprove: (
 
             fetchSignedUrls();
         }
-    }, [open, docs]);
+    }, [open, user.kyc_documents]);
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -667,7 +827,7 @@ function KYCReviewModal({ user, onApprove, onReject }: { user: any, onApprove: (
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">KYC Verification: {user.full_name}</DialogTitle>
                         <DialogDescription className="text-slate-500 font-medium">
-                            Submitted on {new Date(user.kyc_submitted_at).toLocaleString()}
+                            Submitted on {user.kyc_submitted_at ? new Date(user.kyc_submitted_at).toLocaleString() : 'N/A'}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -747,13 +907,13 @@ function KYCReviewModal({ user, onApprove, onReject }: { user: any, onApprove: (
                             <div className="bg-white p-6 rounded-2xl border border-slate-100/80 shadow-sm transition-transform hover:scale-[1.02]">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Biometric Match</p>
                                 <div className="flex items-end gap-3">
-                                    <span className={`text-4xl font-black tracking-tighter ${user.kyc_match_score >= 80 ? 'text-emerald-600' : user.kyc_match_score >= 50 ? 'text-orange-600' : 'text-rose-600'}`}>
-                                        {user.kyc_match_score || 0}%
+                                    <span className={`text-4xl font-black tracking-tighter ${(user.kyc_match_score ?? 0) >= 80 ? 'text-emerald-600' : (user.kyc_match_score ?? 0) >= 50 ? 'text-orange-600' : 'text-rose-600'}`}>
+                                        {user.kyc_match_score ?? 0}%
                                     </span>
                                     <span className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wide">Confidence</span>
                                 </div>
                                 <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
-                                    <div className={`h-full transition-all duration-1000 ${user.kyc_match_score >= 80 ? 'bg-emerald-500' : user.kyc_match_score >= 50 ? 'bg-orange-500' : 'bg-rose-500'}`} style={{ width: `${user.kyc_match_score || 0}%` }} />
+                                    <div className={`h-full transition-all duration-1000 ${(user.kyc_match_score ?? 0) >= 80 ? 'bg-emerald-500' : (user.kyc_match_score ?? 0) >= 50 ? 'bg-orange-500' : 'bg-rose-500'}`} style={{ width: `${user.kyc_match_score ?? 0}%` }} />
                                 </div>
                             </div>
                             <div className="bg-white p-6 rounded-2xl border border-slate-100/80 shadow-sm flex items-center justify-between transition-transform hover:scale-[1.02]">
@@ -832,8 +992,8 @@ function KYCReviewModal({ user, onApprove, onReject }: { user: any, onApprove: (
 }
 
 function AdminView({ loans, kycUsers, onUpdate, onKYCUpdate }: {
-    loans: any[],
-    kycUsers: any[],
+    loans: Loan[],
+    kycUsers: Profile[],
     onUpdate: (id: string, status: string) => void,
     onKYCUpdate: (id: string, status: 'approved' | 'rejected', reason?: string) => void
 }) {
@@ -900,7 +1060,7 @@ function AdminView({ loans, kycUsers, onUpdate, onKYCUpdate }: {
                                                                 <p className="text-xs text-slate-500 font-medium">{loan.profiles?.email || "No email"}</p>
                                                                 <span className="h-1 w-1 rounded-full bg-slate-300" />
                                                                 <BorrowerProfileModal
-                                                                    profile={loan.profiles}
+                                                                    profile={loan.profiles as Profile}
                                                                     loan={loan}
                                                                     onApprove={() => onUpdate(loan.id, 'approved')}
                                                                     onReject={() => onUpdate(loan.id, 'rejected')}
@@ -1032,15 +1192,32 @@ function AdminView({ loans, kycUsers, onUpdate, onKYCUpdate }: {
     );
 }
 
-function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, onShowRepaySuccess }: {
-    loans: any[],
+function BorrowerView({ loans, userId, onLoanCreated, kycStatus, userProfile, onRepayClick }: {
+    loans: Loan[],
     userId: string,
     onLoanCreated: () => void,
     kycStatus: string,
     onShowWallet?: () => void,
-    onShowRepaySuccess: (amount: number, purpose: string) => void
+    userProfile?: Profile,
+    onShowRepaySuccess?: (amt: number, purpose: string) => void,
+    onRepayClick: (loan: Loan) => void
 }) {
-    const totalBorrowed = loans.reduce((acc, l) => acc + (l.amount || 0), 0);
+    const getCreditStatus = (score?: number, status?: string) => {
+        if (score && score > 0) {
+            if (score >= 90) return "Excellent";
+            if (score >= 70) return "Good";
+            if (score >= 50) return "Fair";
+            return "Poor";
+        }
+
+        // Fallback to basic KYC status if AI score isn't available
+        if (status === 'approved') return "Good";
+        if (status === 'pending') return "Pending";
+        return "N/A";
+    };
+
+    const lifetimeLoans = loans.filter(l => ['funded', 'repaid'].includes(l.status));
+    const totalBorrowed = lifetimeLoans.reduce((acc, l) => acc + (l.amount || 0), 0);
     const pendingLoansCount = loans.filter(l => l.status === 'pending').length;
     const approvedLoansCount = loans.filter(l => l.status === 'approved').length;
 
@@ -1084,7 +1261,7 @@ function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, o
                             </div>
                             <div>
                                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Credit Profile</p>
-                                <h3 className="text-2xl font-black text-slate-900">Excellent</h3>
+                                <h3 className="text-2xl font-black text-slate-900">{getCreditStatus(userProfile?.kyc_match_score || 0, kycStatus)}</h3>
                             </div>
                         </div>
                     </CardContent>
@@ -1176,32 +1353,7 @@ function BorrowerView({ loans, userId, onLoanCreated, kycStatus, onShowWallet, o
                                                     </div>
                                                 </div>
                                                 <Button
-                                                    onClick={async () => {
-                                                        if (!confirm(`Are you sure you want to repay this loan? Total amount (Principal + Interest): ${formatINR(repaymentAmount)}`)) return;
-
-                                                        try {
-                                                            const { data, error: rpcError } = await supabase.rpc('process_loan_repayment', {
-                                                                borrower_uid: userId,
-                                                                target_loan_id: loan.id
-                                                            });
-
-                                                            if (rpcError) {
-                                                                console.error("Repayment RPC Error:", JSON.stringify(rpcError, null, 2));
-                                                                throw new Error(rpcError.message || "Unknown RPC error");
-                                                            }
-
-                                                            if (data && data.success === false) {
-                                                                alert(data.error || "Repayment failed");
-                                                                return;
-                                                            }
-
-                                                            onShowRepaySuccess(repaymentAmount, loan.purpose);
-                                                            onLoanCreated();
-                                                        } catch (err: any) {
-                                                            console.error("Repayment Catch Error:", JSON.stringify(err, null, 2));
-                                                            alert("Repayment failed: " + (err.message || "Unknown error"));
-                                                        }
-                                                    }}
+                                                    onClick={() => onRepayClick(loan)}
                                                     className="w-full bg-slate-900 border-0 hover:bg-black text-white rounded-xl font-black uppercase tracking-widest text-[10px] h-10"
                                                 >
                                                     Repay Loan Now

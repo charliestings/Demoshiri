@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import {
     Search,
@@ -14,25 +13,26 @@ import {
     Zap,
     ShieldCheck,
     Info,
-    Filter,
-    X,
     SlidersHorizontal
 } from "lucide-react";
+import { Loan } from "@/types";
 import { formatINR, formatCompactINR } from "@/lib/formatters";
 import { InvestLoanModal } from "./InvestLoanModal";
+import { LoanDetailsModal } from "./LoanDetailsModal";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface LenderViewProps {
-    loans: any[];
+    loans: Loan[];
     userId: string;
     onInvested: () => void;
     kycStatus: string;
     onShowWallet?: () => void;
     onShowSuccess?: (amount: number, purpose: string) => void;
     isLoading?: boolean;
+    onInvestClick?: (loan: Loan, amount: number) => void;
 }
 
-export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet, onShowSuccess, isLoading = false }: LenderViewProps) {
+export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet, onShowSuccess, isLoading = false, onInvestClick }: LenderViewProps) {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
 
@@ -60,6 +60,12 @@ export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet,
         setStatusFilter("all");
     };
 
+    const activeLoans = loans.filter(l => l.status === 'approved');
+    const avgROI = activeLoans.length > 0
+        ? activeLoans.reduce((acc, l) => acc + (l.interest_rate || 0), 0) / activeLoans.length
+        : 0;
+    const activeCapital = loans.reduce((acc, l) => acc + (l.amount || 0), 0);
+
     const activeFiltersCount = (minROI > 0 ? 1 : 0) + (maxAmount < 1000000 ? 1 : 0) + (maxTerm < 60 ? 1 : 0);
 
     return (
@@ -67,9 +73,9 @@ export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet,
             {/* Market Header Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
-                    { label: "Approved Opps", val: loans.length, icon: Briefcase, color: "rose" },
-                    { label: "Avg. ROI", val: "10.4%", icon: TrendingUp, color: "orange" },
-                    { label: "Active Capital", val: formatCompactINR(4200000), icon: Zap, color: "amber" },
+                    { label: "Approved Opps", val: activeLoans.length, icon: Briefcase, color: "rose" },
+                    { label: "Avg. ROI", val: `${avgROI.toFixed(1)}%`, icon: TrendingUp, color: "orange" },
+                    { label: "Active Capital", val: formatCompactINR(activeCapital), icon: Zap, color: "amber" },
                     { label: "Admin Verified", val: "100%", icon: ShieldCheck, color: "emerald" },
                 ].map((stat, i) => (
                     <div key={i} className="p-4 rounded-2xl bg-white/60 backdrop-blur-sm border border-slate-100 flex items-center gap-3 shadow-sm">
@@ -317,11 +323,17 @@ export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet,
                                             kycStatus={kycStatus}
                                             onShowWallet={onShowWallet}
                                             onShowSuccess={onShowSuccess}
+                                            onInvestClick={onInvestClick}
                                         />
                                     </div>
-                                    <Button variant="outline" size="icon" className="rounded-xl border-slate-100 h-10 w-10 text-slate-400">
-                                        <Info className="h-4 w-4" />
-                                    </Button>
+                                    <LoanDetailsModal
+                                        loan={loan}
+                                        userId={userId}
+                                        onInvested={onInvested}
+                                        kycStatus={kycStatus}
+                                        onShowWallet={onShowWallet}
+                                        onShowSuccess={onShowSuccess}
+                                    />
                                 </div>
                             </CardContent>
                         </Card>

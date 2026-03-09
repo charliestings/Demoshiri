@@ -82,8 +82,8 @@ export function LoanDetailsModal({
                                 </DialogTitle>
                                 <div className="flex items-center gap-3">
                                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${isLate ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                            loan.status === 'funded' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                                'bg-orange-50 text-orange-600 border-orange-100'
+                                        loan.status === 'funded' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                            'bg-orange-50 text-orange-600 border-orange-100'
                                         }`}>
                                         {isLate ? 'OVERDUE' : loan.status === 'approved' ? 'Open for Funding' : loan.status}
                                     </span>

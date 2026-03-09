@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { User as SupabaseUser } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,9 +14,10 @@ import { motion } from "framer-motion";
 import { CreditScoreGauge } from "./CreditScoreGauge";
 import { KYCCameraCapture } from "./KYCCameraCapture";
 import { compressImage } from "@/lib/imageUtils";
+import { AlertModal, AlertType } from "./AlertModal";
 
 interface SettingsViewProps {
-    user: any;
+    user: SupabaseUser;
     onUpdate?: () => void;
 }
 
@@ -29,6 +31,25 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
         id_back: null,
         pan_card: null,
         selfie: null
+    });
+
+    const [alertConfig, setAlertConfig] = useState({
+        open: false,
+        title: "",
+        message: "",
+        type: "info" as AlertType,
+        onConfirm: undefined as (() => void) | undefined
+    });
+
+    const showAlert = (title: string, message: string, type: AlertType = "info", onConfirm?: () => void) => {
+        setAlertConfig({ open: true, title, message, type, onConfirm });
+    };
+
+    const [pinLoading, setPinLoading] = useState(false);
+    const [pinData, setPinData] = useState({
+        pin: "",
+        confirmPin: "",
+        hasPin: false
     });
 
     const [formData, setFormData] = useState({
@@ -59,7 +80,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
 
         // KYC
         kyc_status: "not_started",
-        kyc_documents: {} as any,
+        kyc_documents: {} as Record<string, string>,
         kyc_rejection_reason: "",
         kyc_submitted_at: "",
         kyc_match_score: 0,
@@ -71,7 +92,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
     useEffect(() => {
         const fetchProfile = async () => {
             if (!user?.id) return;
-            const { data, error } = await supabase
+            const { data } = await supabase
                 .from("profiles")
                 .select("*")
                 .eq("id", user.id)
@@ -122,6 +143,53 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
         fetchProfile();
     }, [user]);
 
+    // Check if user has a PIN
+    useEffect(() => {
+        const checkPin = async () => {
+            if (!user?.id) return;
+            const { data, error } = await supabase.rpc('has_transaction_pin');
+            if (!error && data !== null) {
+                setPinData(prev => ({ ...prev, hasPin: !!data }));
+            }
+        };
+        checkPin();
+    }, [user]);
+
+    const handleSetPin = async () => {
+        if (pinData.pin.length !== 6) {
+            showAlert("Invalid PIN", "Please enter a 6-digit PIN.", "warning");
+            return;
+        }
+
+        if (pinData.pin !== pinData.confirmPin) {
+            showAlert("Mismatch", "PINs do not match. Please re-enter carefully.", "warning");
+            return;
+        }
+
+        setPinLoading(true);
+        try {
+            const { data, error } = await supabase.rpc('set_transaction_pin', {
+                new_pin: pinData.pin
+            });
+
+            if (error) throw error;
+
+            if (data?.success) {
+                showAlert("Success", "Transaction PIN set successfully!", "success");
+                setPinData(prev => ({ ...prev, pin: "", confirmPin: "", hasPin: true }));
+                if (onUpdate) onUpdate();
+            } else {
+                showAlert("Error", data?.error || "Failed to set PIN", "error");
+            }
+        } catch (error: unknown) {
+            console.error("Error setting PIN:", error);
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            showAlert("System Error", `Failed to set Transaction PIN: ${errorMessage}`, "error");
+        } finally {
+            setPinLoading(false);
+        }
+    };
+
     const handleCheckScore = async () => {
         // 1. Basic Length Check
         if (!formData.pan_number || formData.pan_number.length !== 10) {
@@ -140,7 +208,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
 
         try {
             // Check for duplicate PAN before proceeding
-            const { data: existingPan, error: panError } = await supabase
+            const { data: existingPan } = await supabase
                 .from("profiles")
                 .select("id")
                 .eq("pan_number", formData.pan_number)
@@ -173,9 +241,9 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                 pan_number: formData.pan_number
             }).eq("id", user.id);
 
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Score check error:", e);
-            alert(`Error: ${e.message}`);
+            alert(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
         } finally {
             setCheckingScore(false);
         }
@@ -214,9 +282,9 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
             if (dbError) throw dbError;
 
             alert("Profile image updated successfully!");
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error uploading image:', error);
-            alert(`Error uploading image: ${error.message}`);
+            alert(`Error uploading image: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setLoading(false);
         }
@@ -260,9 +328,9 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
             // 3. Update local state
             setFormData(prev => ({ ...prev, profile_image: "" }));
             alert("Profile photo removed.");
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Error removing photo:", error);
-            alert(`Failed to remove photo: ${error.message}`);
+            alert(`Failed to remove photo: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setLoading(false);
         }
@@ -271,7 +339,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
         setLoading(true);
 
         try {
-            const { error, data } = await supabase
+            const { error } = await supabase
                 .from("profiles")
                 .upsert({
                     id: user.id,
@@ -318,15 +386,16 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
             }
 
             alert("Profile updated successfully!");
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Error updating profile:", error);
-            alert(`Failed to save: ${error.message || 'Unknown error'}`);
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            alert(`Failed to save: ${errorMessage}`);
         } finally {
             setLoading(false);
         }
     };
 
-    const idCardUrl = useEffect(() => {
+    useEffect(() => {
         if (!kycFiles.id_front) return;
         const url = URL.createObjectURL(kycFiles.id_front);
         return () => URL.revokeObjectURL(url);
@@ -380,8 +449,12 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
 
             // Helper to convert dataURL to File
             const dataURLtoFile = (dataurl: string, filename: string) => {
-                let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)![1],
-                    bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+                const arr = dataurl.split(',');
+                const mimeMatch = arr[0].match(/:(.*?);/);
+                const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+                const bstr = atob(arr[1]);
+                let n = bstr.length;
+                const u8arr = new Uint8Array(n);
                 while (n--) {
                     u8arr[n] = bstr.charCodeAt(n);
                 }
@@ -417,7 +490,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
             // Check for duplicate hashes in DB
             for (const [key, hash] of Object.entries(currentHashes)) {
                 // Check if this hash exists for any OTHER user
-                const { data: duplicateUser, error: hashCheckError } = await supabase
+                const { data: duplicateUser } = await supabase
                     .from("profiles")
                     .select("id, full_name")
                     .neq("id", user.id)
@@ -484,9 +557,10 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
 
             if (onUpdate) onUpdate();
             alert(`KYC submitted! AI Match Score: ${capturedSelfie?.score ?? (kycFiles.selfie ? 'Manual Verify' : '0')}%`);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("KYC submission error:", error);
-            alert(`Failed to submit KYC: ${error.message}`);
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
+            alert(`Failed to submit KYC: ${errorMessage}`);
         } finally {
             setKycUploading(false);
         }
@@ -524,9 +598,9 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
 
                 if (onUpdate) onUpdate();
                 alert("KYC has been reset. You can now re-upload your documents.");
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error("KYC reset error:", err);
-                alert(`Failed to reset KYC: ${err.message}`);
+                alert(`Failed to reset KYC: ${err instanceof Error ? err.message : 'Unknown error'}`);
             } finally {
                 setLoading(false);
             }
@@ -553,7 +627,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
             await supabase.auth.signOut();
             window.location.href = "/";
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Fatal deletion error:", error);
             alert("An unexpected error occurred while trying to delete your account.");
         } finally {
@@ -1005,6 +1079,82 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                 </Card>
             </motion.div>
 
+            {/* 5. Transaction Security (PIN) */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }}>
+                <Card className="border-slate-100 shadow-sm overflow-hidden bg-white">
+                    <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-slate-900 flex items-center justify-center text-white">
+                                <Lock className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-lg font-bold text-slate-900">Transaction Security</CardTitle>
+                                <CardDescription>Secure your withdrawals and investments with a PIN.</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-8">
+                        <div className="flex flex-col lg:flex-row gap-8 items-start">
+                            <div className="flex-1 space-y-4 w-full">
+                                {pinData.hasPin ? (
+                                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3">
+                                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                        <div>
+                                            <p className="text-sm font-black text-emerald-900">Transaction PIN is Active</p>
+                                            <p className="text-xs font-medium text-emerald-700/80 mt-0.5">Your wallet is now protected. Enter below to change your PIN.</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl flex items-center gap-3">
+                                        <AlertCircle className="h-5 w-5 text-orange-500" />
+                                        <div>
+                                            <p className="text-sm font-black text-orange-900">No Transaction PIN Set</p>
+                                            <p className="text-xs font-medium text-orange-700/80 mt-0.5">Highly recommended to protect your funds.</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">{pinData.hasPin ? "New 6-Digit PIN" : "Set 6-Digit PIN"}</Label>
+                                        <Input
+                                            type="password"
+                                            maxLength={6}
+                                            placeholder="••••••"
+                                            value={pinData.pin}
+                                            onChange={(e) => setPinData({ ...pinData, pin: e.target.value.replace(/\D/g, '') })}
+                                            className="rounded-xl border-slate-200 bg-slate-50/50 text-center font-black tracking-[1em] text-lg"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Confirm PIN</Label>
+                                        <Input
+                                            type="password"
+                                            maxLength={6}
+                                            placeholder="••••••"
+                                            value={pinData.confirmPin}
+                                            onChange={(e) => setPinData({ ...pinData, confirmPin: e.target.value.replace(/\D/g, '') })}
+                                            className="rounded-xl border-slate-200 bg-slate-50/50 text-center font-black tracking-[1em] text-lg"
+                                        />
+                                    </div>
+                                </div>
+                                <Button
+                                    onClick={handleSetPin}
+                                    disabled={pinLoading || pinData.pin.length !== 6 || pinData.pin !== pinData.confirmPin}
+                                    className="w-full bg-slate-900 text-white font-bold rounded-xl h-12 shadow-lg hover:translate-y-[-2px] transition-all uppercase tracking-widest text-[10px]"
+                                >
+                                    {pinLoading ? "Securing..." : pinData.hasPin ? "Update Transaction PIN" : "Enable PIN Protection"}
+                                </Button>
+                            </div>
+                            <div className="hidden lg:block w-48 text-center space-y-2 opacity-40">
+                                <Shield className="h-16 w-16 mx-auto text-slate-400" />
+                                <p className="text-[10px] font-black uppercase tracking-tighter">Double-Layer Security Active</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </motion.div>
+
             {/* Notifications */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
                 <Card className="border-slate-100 shadow-sm overflow-hidden">
@@ -1057,6 +1207,15 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                     </Button>
                 </div>
             </motion.div>
+
+            <AlertModal
+                isOpen={alertConfig.open}
+                onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
+                onConfirm={alertConfig.onConfirm}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+            />
         </div >
     );
 }

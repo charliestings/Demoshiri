@@ -183,6 +183,8 @@ BEGIN
         UPDATE public.loans 
         SET funded_amount = new_funded_amount, 
             status = 'funded', 
+            funded_at = NOW(),
+            due_date = NOW() + (loan_record.duration_months || ' months')::INTERVAL,
             updated_at = NOW()
         WHERE id = target_loan_id;
 

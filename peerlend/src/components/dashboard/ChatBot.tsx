@@ -43,6 +43,7 @@ export function ChatBot() {
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const suggestionsRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -114,12 +115,12 @@ export function ChatBot() {
             };
 
             setMessages(prev => [...prev, assistantMsg]);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Chat Error:", error);
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content: `Error: ${error.message || "I'm having trouble connecting right now."} Please check your Gemini API key or try again later!`,
+                content: `Error: ${error instanceof Error ? error.message : "I'm having trouble connecting right now."} Please check your Gemini API key or try again later!`,
                 timestamp: new Date()
             }]);
         } finally {
@@ -238,7 +239,15 @@ export function ChatBot() {
 
                         {/* Fixed Suggestions */}
                         <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 relative">
-                            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1 touch-pan-x select-none">
+                            <div
+                                ref={suggestionsRef}
+                                onWheel={(e) => {
+                                    if (suggestionsRef.current) {
+                                        suggestionsRef.current.scrollLeft += e.deltaY;
+                                    }
+                                }}
+                                className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1 touch-pan-x select-none"
+                            >
                                 {suggestions.map((s, idx) => (
                                     <button
                                         key={idx}
@@ -319,7 +328,7 @@ export function ChatBot() {
                                     <div className="space-y-1">
                                         <p className="text-[12px] font-black text-rose-500 uppercase tracking-widest">Assistant</p>
                                         <p className="text-[14px] font-bold text-slate-900 leading-[1.3]">
-                                            Hi! I'm PeerLend AI. <br />
+                                            Hi! I{"'"}m PeerLend AI. <br />
                                             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-rose-600 font-black">How can I help you today?</span>
                                         </p>
                                     </div>
@@ -337,7 +346,7 @@ export function ChatBot() {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setIsOpen(true)}
-                        className="h-16 w-16 rounded-[2rem] bg-gradient-to-br from-orange-500 to-rose-600 shadow-2xl shadow-rose-500/40 flex items-center justify-center text-white self-end"
+                        className="relative h-16 w-16 rounded-[2rem] bg-gradient-to-br from-orange-500 to-rose-600 shadow-2xl shadow-rose-500/40 flex items-center justify-center text-white self-end"
                     >
                         <MessageSquare className="h-7 w-7" />
                         <motion.div

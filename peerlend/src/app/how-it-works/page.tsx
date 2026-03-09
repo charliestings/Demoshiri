@@ -8,13 +8,13 @@ import {
     ShieldCheck,
     ArrowRight,
     TrendingUp,
+    HandCoins,
     Users,
     Search,
     Zap,
     CheckCircle2,
     ArrowLeft,
-    PiggyBank,
-    HandCoins
+    PiggyBank
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -95,7 +95,7 @@ export default function HowItWorksPage() {
                         How <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-rose-600">PeerLend</span> Works
                     </h1>
                     <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-                        We've removed the complexity of traditional banking.
+                        We&apos;ve removed the complexity of traditional banking.
                         Choose your journey and see how PeerLend empowers you.
                     </p>
                 </div>
@@ -106,8 +106,8 @@ export default function HowItWorksPage() {
                         <button
                             onClick={() => setView("lender")}
                             className={`px-8 py-3 rounded-xl font-bold transition-all duration-300 flex items-center gap-2 ${view === "lender"
-                                    ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg"
-                                    : "text-slate-500 hover:bg-slate-50"
+                                ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg"
+                                : "text-slate-500 hover:bg-slate-50"
                                 }`}
                         >
                             <PiggyBank className="h-5 w-5" />
@@ -116,8 +116,8 @@ export default function HowItWorksPage() {
                         <button
                             onClick={() => setView("borrower")}
                             className={`px-8 py-3 rounded-xl font-bold transition-all duration-300 flex items-center gap-2 ${view === "borrower"
-                                    ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg"
-                                    : "text-slate-500 hover:bg-slate-50"
+                                ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg"
+                                : "text-slate-500 hover:bg-slate-50"
                                 }`}
                         >
                             <HandCoins className="h-5 w-5" />

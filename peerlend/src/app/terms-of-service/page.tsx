@@ -40,7 +40,7 @@ export default function TermsOfService() {
                 >
                     <h3>1. Acceptance of Terms</h3>
                     <p>
-                        By accessing or using PeerLend ("Service"), you agree to be bound by these Terms. If you disagree with any part of the terms, then you may not access the Service.
+                        By accessing or using PeerLend (&quot;Service&quot;), you agree to be bound by these Terms. If you disagree with any part of the terms, then you may not access the Service.
                     </p>
 
                     <h3>2. Accounts</h3>

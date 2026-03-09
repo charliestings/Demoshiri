@@ -64,7 +64,7 @@ export default function CookiesPolicy() {
 
                     <h3>4. Your Choices Regarding Cookies</h3>
                     <p>
-                        If you'd like to delete cookies or instruct your web browser to delete or refuse cookies, please visit the help pages of your web browser. Please note, however, that if you delete cookies or refuse to accept them, you might not be able to use all of the features we offer, you may not be able to store your preferences, and some of our pages might not display properly.
+                        If you&apos;d like to delete cookies or instruct your web browser to delete or refuse cookies, please visit the help pages of your web browser. Please note, however, that if you delete cookies or refuse to accept them, you might not be able to use all of the features we offer, you may not be able to store your preferences, and some of our pages might not display properly.
                     </p>
 
                     <h3>5. Contact Us</h3>

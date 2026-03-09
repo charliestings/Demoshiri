@@ -1,0 +1,219 @@
+﻿
+> peerlend1@0.1.0 lint
+> eslint
+
+
+D:\studying\peerlend1\peerlend\src\app\(auth)\forgot-password\page.tsx
+  58:27  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\app\(auth)\login\page.tsx
+  127:24  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\app\(auth)\reset-password\page.tsx
+   3:20  warning  'useEffect' is defined but never used                            @typescript-eslint/no-unused-vars
+  70:28  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\app\(auth)\signup\page.tsx
+   26:11  warning  'router' is assigned a value but never used                      @typescript-eslint/no-unused-vars
+  208:83  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  247:81  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  321:27  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\app\about\page.tsx
+   4:10  warning  'Button' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   7:8   warning  'Image' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  40:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+D:\studying\peerlend1\peerlend\src\app\api\cashfree\create-order\route.ts
+  65:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\studying\peerlend1\peerlend\src\app\api\cashfree\verify\route.ts
+  104:27  warning  'depositData' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  118:21  error    Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+
+D:\studying\peerlend1\peerlend\src\app\api\chat\route.ts
+  34:58  error  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+  39:13  error  'validHistory' is never reassigned. Use 'const' instead  prefer-const
+  39:27  error  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+  65:21  error  Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+
+D:\studying\peerlend1\peerlend\src\app\careers\page.tsx
+   7:8    warning  'Link' is defined but never used                                 @typescript-eslint/no-unused-vars
+  28:114  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  33:27   error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  33:82   error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\app\contact\page.tsx
+  20:114  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\app\cookies\page.tsx
+  67:31  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\app\dashboard\page.tsx
+  751:45  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+D:\studying\peerlend1\peerlend\src\app\how-it-works\page.tsx
+   11:5   warning  'Users' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   98:27  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+  207:33  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+D:\studying\peerlend1\peerlend\src\app\onboarding\page.tsx
+   6:10  warning  'Button' is defined but never used        @typescript-eslint/no-unused-vars
+   8:19  warning  'User' is defined but never used          @typescript-eslint/no-unused-vars
+  13:38  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  28:40  warning  'role' is defined but never used          @typescript-eslint/no-unused-vars
+
+D:\studying\peerlend1\peerlend\src\app\page.tsx
+    6:52  warning  'CheckCircle' is defined but never used                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+    8:8   warning  'Image' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   10:15  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  100:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  125:17  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+  125:77  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+  233:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+D:\studying\peerlend1\peerlend\src\app\press\page.tsx
+  6:34  warning  'Newspaper' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\studying\peerlend1\peerlend\src\app\support\page.tsx
+  149:86  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\app\terms-of-service\page.tsx
+  43:57  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  43:65  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\AlertModal.tsx
+  9:5  warning  'X' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\ChatBot.tsx
+   13:5   warning  'ChevronDown' is defined but never used                          @typescript-eslint/no-unused-vars
+   22:10  warning  'formatINR' is defined but never used                            @typescript-eslint/no-unused-vars
+  117:25  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  322:50  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\InvestLoanModal.tsx
+   7:31  warning  'Wallet' is defined but never used                   @typescript-eslint/no-unused-vars
+  10:10  warning  'TransactionSuccessModal' is defined but never used  @typescript-eslint/no-unused-vars
+  13:11  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  26:5   warning  'onShowWallet' is defined but never used             @typescript-eslint/no-unused-vars
+  80:25  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\KYCCameraCapture.tsx
+   17:12   warning  'isVerifying' is assigned a value but never used                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  148:23   error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  223:87   error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+  253:21   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  270:109  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+  270:122  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                          react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\LenderView.tsx
+   4:29  warning  'CardHeader' is defined but never used    @typescript-eslint/no-unused-vars
+   4:41  warning  'CardTitle' is defined but never used     @typescript-eslint/no-unused-vars
+   8:10  warning  'Input' is defined but never used         @typescript-eslint/no-unused-vars
+  17:5   warning  'Filter' is defined but never used        @typescript-eslint/no-unused-vars
+  18:5   warning  'X' is defined but never used             @typescript-eslint/no-unused-vars
+  26:12  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\LoanDetailsModal.tsx
+   4:33  warning  'DialogDescription' is defined but never used  @typescript-eslint/no-unused-vars
+   6:10  warning  'Card' is defined but never used               @typescript-eslint/no-unused-vars
+   6:16  warning  'CardContent' is defined but never used        @typescript-eslint/no-unused-vars
+  15:5   warning  'Briefcase' is defined but never used          @typescript-eslint/no-unused-vars
+  16:5   warning  'CheckCircle2' is defined but never used       @typescript-eslint/no-unused-vars
+  25:11  error    Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\NotificationsView.tsx
+    5:29  warning  'CardHeader' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+    5:41  warning  'CardTitle' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+    5:52  warning  'CardDescription' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+   10:8   warning  'Link' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+   13:56  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+   37:8   warning  React Hook useEffect has a missing dependency: 'fetchNotifications'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                             react-hooks/exhaustive-deps
+   66:49  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+   84:13  error    Error: This value cannot be modified
+
+Modifying a variable defined outside a component or hook is not allowed. Consider using an effect.
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\NotificationsView.tsx:84:13
+  82 |             // Use window.location for now as it's the most reliable way to trigger 
+  83 |             // the full state update in page.tsx if it's listening to URL params
+> 84 |             window.location.href = notification.link;
+     |             ^^^^^^^^^^^^^^^ value cannot be modified
+  85 |         }
+  86 |     };
+  87 |  react-hooks/immutability
+  136:62  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   react/no-unescaped-entities
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\OverviewStats.tsx
+   7:13  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+   8:19  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  17:15  warning  'myLoans' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\PinVerificationModal.tsx
+    7:5   warning  'DialogHeader' is defined but never used  @typescript-eslint/no-unused-vars
+   10:5   warning  'DialogFooter' is defined but never used  @typescript-eslint/no-unused-vars
+   13:10  warning  'Input' is defined but never used         @typescript-eslint/no-unused-vars
+  108:23  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\RequestLoanModal.tsx
+   6:10  warning  'Input' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+   7:10  warning  'Label' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+  55:8   warning  React Hook useEffect has a missing dependency: 'fetchLoanStats'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\SettingsView.tsx
+   11:30  warning  'Lock' is defined but never used                     @typescript-eslint/no-unused-vars
+   18:11  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+   62:30  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+   74:27  warning  'error' is assigned a value but never used           @typescript-eslint/no-unused-vars
+  143:47  warning  'panError' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  176:21  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  217:25  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  263:25  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  274:28  warning  'data' is assigned a value but never used            @typescript-eslint/no-unused-vars
+  321:25  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  329:11  warning  'idCardUrl' is assigned a value but never used       @typescript-eslint/no-unused-vars
+  383:21  error    'arr' is never reassigned. Use 'const' instead       prefer-const
+  383:47  error    'mime' is never reassigned. Use 'const' instead      prefer-const
+  384:21  error    'bstr' is never reassigned. Use 'const' instead      prefer-const
+  384:59  error    'u8arr' is never reassigned. Use 'const' instead     prefer-const
+  420:53  warning  'hashCheckError' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  487:25  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  527:27  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+  556:25  error    Unexpected any. Specify a different type             @typescript-eslint/no-explicit-any
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\Sidebar.tsx
+   7:5   warning  'Briefcase' is defined but never used  @typescript-eslint/no-unused-vars
+  15:13  warning  'HomeIcon' is defined but never used   @typescript-eslint/no-unused-vars
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\TransactionsView.tsx
+   9:5   warning  'Loader2' is defined but never used       @typescript-eslint/no-unused-vars
+  29:54  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\studying\peerlend1\peerlend\src\components\dashboard\WalletView.tsx
+    4:29  warning  'CardHeader' is defined but never used                   @typescript-eslint/no-unused-vars
+    4:41  warning  'CardTitle' is defined but never used                    @typescript-eslint/no-unused-vars
+   11:5   warning  'History' is defined but never used                      @typescript-eslint/no-unused-vars
+   18:5   warning  'Clock' is defined but never used                        @typescript-eslint/no-unused-vars
+   21:18  warning  'AnimatePresence' is defined but never used              @typescript-eslint/no-unused-vars
+   33:12  warning  'transactions' is assigned a value but never used        @typescript-eslint/no-unused-vars
+   33:54  error    Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+   94:21  warning  'data' is assigned a value but never used                @typescript-eslint/no-unused-vars
+  103:25  error    Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+  129:21  warning  'data' is assigned a value but never used                @typescript-eslint/no-unused-vars
+  141:25  error    Unexpected any. Specify a different type                 @typescript-eslint/no-explicit-any
+  149:11  warning  'getTransactionIcon' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\studying\peerlend1\peerlend\src\components\layout\Navbar.tsx
+   3:8   warning  'Image' is defined but never used         @typescript-eslint/no-unused-vars
+  13:38  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\studying\peerlend1\peerlend\src\components\ui\avatar.tsx
+  25:5  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  25:5  warning  img elements must have an alt prop, either with meaningful text, or an empty string for decorative images                                                                                                                                                                                jsx-a11y/alt-text
+
+D:\studying\peerlend1\peerlend\src\components\ui\input.tsx
+  5:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+Γ£û 130 problems (61 errors, 69 warnings)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+
