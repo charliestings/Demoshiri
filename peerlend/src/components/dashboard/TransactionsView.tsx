@@ -34,15 +34,17 @@ export function TransactionsView({ userId }: TransactionsViewProps) {
 
     const fetchTransactions = useCallback(async () => {
         try {
+            // wallets.id = userId (wallet primary key IS the user ID)
+            // so wallet_transactions.wallet_id = userId directly
             const { data, error } = await supabase
                 .from("wallet_transactions")
                 .select("*")
                 .eq("wallet_id", userId)
-                .order("created_at", { ascending: false });
+                .order("created_at", { ascending: false })
+                .limit(50);
 
             if (error) throw error;
             setTransactions(data || []);
-            // Removed Artificial Delay
 
         } catch (error: unknown) {
             console.error("Error fetching transactions:", error);
@@ -195,21 +197,20 @@ export function TransactionsView({ userId }: TransactionsViewProps) {
                                 filteredTransactions.map((txn) => (
                                     <motion.div
                                         key={txn.id}
-                                        layout
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, scale: 0.95 }}
-                                        className="p-10 hover:bg-slate-50/80 transition-all duration-300 flex items-center justify-between group"
+                                        className="p-4 md:p-8 hover:bg-slate-50/80 transition-all duration-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 group"
                                     >
-                                        <div className="flex items-center gap-8">
-                                            <div className={`h-16 w-16 rounded-[1.25rem] bg-white border-2 border-slate-50 shadow-sm flex items-center justify-center group-hover:scale-110 group-hover:border-orange-100 group-hover:shadow-orange-100/50 transition-all duration-500`}>
+                                        <div className="flex items-center gap-4 md:gap-8">
+                                            <div className={`h-12 w-12 md:h-16 md:w-16 rounded-[1.25rem] bg-white border-2 border-slate-50 shadow-sm flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:border-orange-100 group-hover:shadow-orange-100/50 transition-all duration-500`}>
                                                 {getTransactionIcon(txn.type)}
                                             </div>
                                             <div>
-                                                <p className="text-xl font-black text-slate-900 tracking-tight capitalize group-hover:text-orange-600 transition-colors">
+                                                <p className="text-base md:text-xl font-black text-slate-900 tracking-tight capitalize group-hover:text-orange-600 transition-colors">
                                                     {txn.description || txn.type.replace('_', ' ')}
                                                 </p>
-                                                <div className="flex items-center gap-4 mt-2">
+                                                <div className="flex items-center gap-3 mt-1">
                                                     <div className="flex items-center gap-1.5 text-slate-400">
                                                         <Clock className="h-3 w-3" />
                                                         <p className="text-[11px] font-bold uppercase tracking-wider">
@@ -221,11 +222,11 @@ export function TransactionsView({ userId }: TransactionsViewProps) {
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className={`text-3xl font-black tracking-tighter ${txn.amount > 0 ? 'text-emerald-600' : 'text-slate-900'} group-hover:scale-105 transition-transform duration-300`}>
+                                        <div className="text-left sm:text-right pl-16 sm:pl-0">
+                                            <p className={`text-xl md:text-3xl font-black tracking-tighter ${txn.amount > 0 ? 'text-emerald-600' : 'text-slate-900'} group-hover:scale-105 transition-transform duration-300`}>
                                                 {txn.amount > 0 ? '+' : ''}{formatINR(txn.amount)}
                                             </p>
-                                            <div className="flex items-center justify-end gap-2 mt-2">
+                                            <div className="flex items-center sm:justify-end gap-2 mt-1">
                                                 <div className={`h-2 w-2 rounded-full ${txn.amount > 0 ? 'bg-emerald-500' : 'bg-slate-400'} animate-pulse`} />
                                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Settled</p>
                                             </div>

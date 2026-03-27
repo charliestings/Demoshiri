@@ -23,15 +23,13 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+
+import { useDashboard } from "@/context/DashboardContext";
 
 interface SidebarProps {
     activeTab: string;
-    setActiveTab: (tab: string) => void;
-    userRole: "borrower" | "lender";
-    isAdmin?: boolean;
-    userEmail?: string;
-    unreadNotifications?: number;
     isOpen?: boolean;
     onClose?: () => void;
     isExpanded?: boolean;
@@ -40,17 +38,15 @@ interface SidebarProps {
 
 export function Sidebar({ 
     activeTab, 
-    setActiveTab, 
-    userRole, 
-    isAdmin, 
-    userEmail, 
-    unreadNotifications, 
     isOpen, 
     onClose,
     isExpanded = false,
     onToggleExpand
 }: SidebarProps) {
     const router = useRouter();
+    const { profile, isAdmin, unreadNotifications } = useDashboard();
+    const userRole = profile?.is_admin ? "admin" : "member"; // Simplified for now
+    const userEmail = profile?.email;
 
     const handleSignOut = () => {
         supabase.auth.signOut();
@@ -60,7 +56,7 @@ export function Sidebar({
     const menuItems = [
         { id: "overview", label: "Overview", icon: LayoutDashboard },
         { id: "wallet", label: "My Wallet", icon: Wallet },
-        { id: "market", label: "Explore Loans", icon: PiggyBank },
+        { id: "explore", label: "Explore Loans", icon: PiggyBank },
         { id: "loans", label: "Borrow (My Loans)", icon: Wallet },
         { id: "notifications", label: "Notifications", icon: Bell, count: unreadNotifications },
         { id: "transactions", label: "Transactions", icon: FileText },
@@ -70,7 +66,7 @@ export function Sidebar({
     ];
 
     const handleNav = (id: string) => {
-        setActiveTab(id);
+        router.push(`/dashboard/${id}`);
         if (window.innerWidth < 1024 && onClose) {
             onClose();
         }
@@ -175,14 +171,17 @@ export function Sidebar({
                     </div>
                 )}
 
-                {/* Navigation Items */}
                 <nav className="flex-1 px-3 space-y-1.5 py-6 overflow-y-auto scrollbar-hide">
                     {menuItems.map((item) => {
                         const isActive = activeTab === item.id;
                         return (
-                            <button
+                            <Link
                                 key={item.id}
-                                onClick={() => handleNav(item.id)}
+                                href={`/dashboard/${item.id}`}
+                                onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                                    if (window.innerWidth < 1024 && onClose) onClose();
+                                    if (!isExpanded && onToggleExpand) onToggleExpand();
+                                }}
                                 title={!isExpanded ? item.label : ""}
                                 className={cn(
                                     "w-full flex items-center transition-all duration-300 group relative overflow-hidden",
@@ -194,7 +193,6 @@ export function Sidebar({
                             >
                                 {isActive && (
                                     <motion.div
-                                        layoutId="active-bg"
                                         className="absolute inset-0 bg-gradient-to-r from-orange-500/20 to-rose-500/20 opacity-100"
                                     />
                                 )}
@@ -219,14 +217,13 @@ export function Sidebar({
 
                                 {isActive && (
                                     <motion.div
-                                        layoutId="active-indicator"
                                         className={cn(
                                             "absolute left-0 bg-gradient-to-b from-orange-500 to-rose-600 rounded-r-full shadow-[0_0_15px_rgba(244,63,94,0.6)] z-20",
                                             isExpanded ? "w-1 h-6" : "w-1 h-8"
                                         )}
                                     />
                                 )}
-                            </button>
+                            </Link>
                         );
                     })}
                 </nav>

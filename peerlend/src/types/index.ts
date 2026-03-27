@@ -62,3 +62,15 @@ export type AuthFieldErrors = {
     state?: string;
     pincode?: string;
 };
+
+export type AlertType = 'success' | 'error' | 'warning' | 'info';
+
+export interface ContactMessage {
+    id: string;
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+    status: string;
+    created_at: string;
+}

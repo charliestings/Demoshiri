@@ -65,6 +65,16 @@ function FAQItem({ q, a }: { q: string, a: string }) {
 }
 
 export default function SupportPage() {
+    const [searchQuery, setSearchQuery] = useState("");
+
+    const filteredFaqs = faqs.map(cat => ({
+        ...cat,
+        items: cat.items.filter(item => 
+            item.q.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            item.a.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+    })).filter(cat => cat.items.length > 0);
+
     return (
         <main className="min-h-screen bg-[#FFFBF9] selection:bg-orange-100 selection:text-orange-900">
             <Navbar />
@@ -73,7 +83,7 @@ export default function SupportPage() {
             <section className="pt-40 pb-20 px-6 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-orange-50/50 to-transparent -z-10" />
 
-                <div className="max-w-4xl mx-auto text-center">
+                <div className="max-w-4xl mx-auto text-center relative z-20">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -87,58 +97,73 @@ export default function SupportPage() {
                         How can we help?
                     </h1>
 
-                    <div className="relative max-w-xl mx-auto">
-                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <div className="relative max-w-xl mx-auto z-30">
+                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" />
                         <input
                             type="text"
                             placeholder="Search for answers..."
-                            className="w-full h-16 pl-16 pr-6 rounded-full border-2 border-orange-100 bg-white/80 backdrop-blur-sm focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 shadow-lg shadow-orange-500/5 text-lg font-medium text-slate-900 transition-all placeholder:text-slate-400"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full h-16 pl-16 pr-6 rounded-full border-2 border-orange-100 bg-white/80 backdrop-blur-sm focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 shadow-lg shadow-orange-500/5 text-lg font-medium text-slate-900 transition-all placeholder:text-slate-500 relative z-30"
                         />
                     </div>
                 </div>
             </section>
 
-            {/* Categories Grid */}
-            <section className="px-6 pb-12">
-                <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6">
-                    {[
-                        { icon: Zap, title: "Quick Start", desc: "Guides to get you up and running." },
-                        { icon: ShieldCheck, title: "Trust & Safety", desc: "How we protect your capital." },
-                        { icon: MessageCircle, title: "Community", desc: "Tips from our top lenders." },
-                    ].map((c, i) => (
-                        <motion.div
-                            key={i}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.1 }}
-                            className="bg-white p-8 rounded-[2rem] border border-orange-50 hover:shadow-xl hover:shadow-orange-500/5 transition-all group cursor-pointer hover:-translate-y-1"
-                        >
-                            <div className="h-12 w-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                                <c.icon className="h-6 w-6" />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-900 mb-2">{c.title}</h3>
-                            <p className="text-slate-500 font-medium mb-4">{c.desc}</p>
-                            <span className="text-rose-600 font-bold text-sm flex items-center group-hover:gap-2 transition-all">
-                                View Articles <ArrowRight className="ml-2 h-4 w-4" />
-                            </span>
-                        </motion.div>
-                    ))}
-                </div>
-            </section>
+            {/* Categories Grid (Hidden during search) */}
+            <AnimatePresence>
+                {!searchQuery && (
+                    <motion.section 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="px-6 pb-12 overflow-hidden"
+                    >
+                        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6">
+                            {[
+                                { icon: Zap, title: "Quick Start", desc: "Guides to get you up and running." },
+                                { icon: ShieldCheck, title: "Trust & Safety", desc: "How we protect your capital." },
+                                { icon: MessageCircle, title: "Community", desc: "Tips from our top lenders." },
+                            ].map((c, i) => (
+                                <div
+                                    key={i}
+                                    className="bg-white p-8 rounded-[2rem] border border-orange-50 hover:shadow-xl hover:shadow-orange-500/5 transition-all group cursor-pointer hover:-translate-y-1"
+                                >
+                                    <div className="h-12 w-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                        <c.icon className="h-6 w-6" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-900 mb-2">{c.title}</h3>
+                                    <p className="text-slate-500 font-medium mb-4">{c.desc}</p>
+                                    <span className="text-rose-600 font-bold text-sm flex items-center group-hover:gap-2 transition-all">
+                                        View Articles <ArrowRight className="ml-2 h-4 w-4" />
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </motion.section>
+                )}
+            </AnimatePresence>
 
             {/* FAQs */}
             <section className="py-20 px-6">
                 <div className="max-w-3xl mx-auto space-y-16">
-                    {faqs.map((cat, i) => (
-                        <div key={i}>
-                            <h2 className="text-2xl font-black text-rose-950 mb-8 font-outfit">{cat.category}</h2>
-                            <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-rose-50">
-                                {cat.items.map((item, j) => (
-                                    <FAQItem key={j} q={item.q} a={item.a} />
-                                ))}
+                    {filteredFaqs.length > 0 ? (
+                        filteredFaqs.map((cat, i) => (
+                            <div key={i} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <h2 className="text-2xl font-black text-rose-950 mb-8 font-outfit">{cat.category}</h2>
+                                <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-rose-50">
+                                    {cat.items.map((item, j) => (
+                                        <FAQItem key={j} q={item.q} a={item.a} />
+                                    ))}
+                                </div>
                             </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-12 animate-in fade-in duration-300">
+                            <h3 className="text-2xl font-bold text-slate-900 mb-2">No answers found</h3>
+                            <p className="text-slate-500 text-lg">We couldn't find anything matching <span className="font-bold text-rose-600">"{searchQuery}"</span>.</p>
                         </div>
-                    ))}
+                    )}
                 </div>
             </section>
 

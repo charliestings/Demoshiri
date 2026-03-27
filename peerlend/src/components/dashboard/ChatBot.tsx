@@ -136,8 +136,10 @@ export function ChatBot() {
     ];
 
     const isAuthPage = pathname?.startsWith('/login') || pathname?.startsWith('/signup') || pathname?.startsWith('/reset-password') || pathname?.startsWith('/forgot-password');
+    const isContactPage = pathname?.startsWith('/contact');
 
-    if (isAuthPage) return null;
+    // Hide chatbot on pages where it visually clashes or is redundant
+    if (isAuthPage || isContactPage) return null;
 
     return (
         <div className="fixed top-0 bottom-0 right-8 z-[100] font-inter pointer-events-none flex flex-col justify-end pb-8">

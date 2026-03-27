@@ -92,7 +92,8 @@ export function WalletView({ userId }: WalletViewProps) {
                 .from("wallet_transactions")
                 .select("*")
                 .eq("wallet_id", userId)
-                .order("created_at", { ascending: false });
+                .order("created_at", { ascending: false })
+                .limit(50);
 
             if (txnsError) throw txnsError;
             setTransactions(txns || []);
@@ -315,7 +316,7 @@ export function WalletView({ userId }: WalletViewProps) {
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="relative overflow-hidden rounded-[2.5rem] bg-slate-950 p-10 text-white shadow-2xl shadow-slate-900/40"
+                className="relative overflow-hidden rounded-[2.5rem] bg-slate-950 p-6 md:p-10 text-white shadow-2xl shadow-slate-900/40"
             >
                 {/* Decorative background elements */}
                 <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-orange-500/10 blur-[80px]" />
@@ -329,8 +330,8 @@ export function WalletView({ userId }: WalletViewProps) {
                             </div>
                             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Total Balance</span>
                         </div>
-                        <div className="flex items-baseline gap-4">
-                            <h2 className="text-6xl font-black tracking-tighter">
+                        <div className="flex items-baseline gap-4 flex-wrap">
+                            <h2 className="text-4xl md:text-6xl font-black tracking-tighter">
                                 {balance !== null ? formatINR(balance) : "₹0.00"}
                             </h2>
                             <span className="text-emerald-400 font-bold text-sm bg-emerald-400/10 px-3 py-1 rounded-full border border-emerald-400/20">
@@ -340,7 +341,7 @@ export function WalletView({ userId }: WalletViewProps) {
                         <p className="text-slate-400 text-sm font-medium">Your protected capital on PeerLend.</p>
                     </div>
 
-                    <div className="flex gap-4">
+                    <div className="flex gap-3 flex-wrap">
                         <Dialog open={showDepositModal} onOpenChange={setShowDepositModal}>
                             <DialogTrigger asChild>
                                 <Button className="bg-orange-500 hover:bg-orange-600 text-white rounded-2xl h-16 px-10 font-black uppercase tracking-widest shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02]">

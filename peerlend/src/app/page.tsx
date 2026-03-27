@@ -323,7 +323,7 @@ export default function Home() {
       </section>
 
 
-      <footer className="py-20 px-6 border-t border-rose-100 bg-orange-50/40 backdrop-blur-sm">
+      <footer className="pt-20 pb-32 px-6 border-t border-rose-100 bg-orange-50/40 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto grid md:grid-cols-5 gap-12 mb-16">
           <div className="col-span-2">
             <div className="flex items-center gap-3 mb-6">
@@ -371,13 +371,13 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-rose-300 text-xs font-bold uppercase tracking-widest border-t border-rose-100 pt-10">
-          <span className="text-rose-400/60">© 2026 PeerLend — Built for people.</span>
-          <div className="flex gap-8 mt-6 md:mt-0">
+        <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-6 text-rose-300 text-xs font-bold uppercase tracking-widest border-t border-rose-100 pt-10 text-center">
+          <div className="flex flex-wrap justify-center gap-6 md:gap-10">
             <Link href="/privacy-policy" className="hover:text-rose-600 transition-colors">Privacy</Link>
             <Link href="/terms-of-service" className="hover:text-rose-600 transition-colors">Terms</Link>
             <Link href="/cookies" className="hover:text-rose-600 transition-colors">Cookies</Link>
           </div>
+          <span className="text-rose-400/60 block">© 2026 PeerLend — Built for people.</span>
         </div>
       </footer>
     </main>

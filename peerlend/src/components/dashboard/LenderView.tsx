@@ -71,7 +71,7 @@ export function LenderView({ loans, userId, onInvested, kycStatus, onShowWallet,
     return (
         <div className="space-y-8 relative z-10">
             {/* Market Header Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {[
                     { label: "Approved Opps", val: activeLoans.length, icon: Briefcase, color: "rose" },
                     { label: "Avg. ROI", val: `${avgROI.toFixed(1)}%`, icon: TrendingUp, color: "orange" },
