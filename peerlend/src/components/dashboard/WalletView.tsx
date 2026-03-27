@@ -97,9 +97,7 @@ export function WalletView({ userId }: WalletViewProps) {
             if (txnsError) throw txnsError;
             setTransactions(txns || []);
 
-            // Add Artificial Delay so user can see Skeletons!
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
+            // Removed Artificial Delay
         } catch (error) {
             console.error("Error fetching wallet data:", error);
         } finally {
@@ -613,27 +611,7 @@ export function WalletView({ userId }: WalletViewProps) {
                 )}
             </motion.div>
 
-            {/* Quick Actions / Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[
-                    { label: "Total Invested", val: "₹1,24,000", icon: TrendingUp, color: "rose" },
-                    { label: "Total Borrowed", val: "₹0", icon: ArrowDownCircle, color: "orange" },
-                    { label: "Platform Earnings", val: "₹12,400", icon: DollarSign, color: "emerald" },
-                ].map((stat, i) => (
-                    <Card key={i} className="rounded-3xl border-slate-100 shadow-sm bg-white overflow-hidden group">
-                        <CardContent className="p-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <div className={`h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-all`}>
-                                    <stat.icon className="h-5 w-5" />
-                                </div>
-                                <ArrowUpCircle className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                            <h3 className="text-2xl font-black text-slate-900">{stat.val}</h3>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+            {/* Quick Actions / Stats removed as per user request */}
 
 
 

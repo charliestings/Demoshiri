@@ -119,6 +119,7 @@ export default function SignupPage() {
                 .from('profiles')
                 .update({
                     full_name: metadata.full_name,
+                    email: formData.email,
                     phone: metadata.phone,
                     date_of_birth: metadata.date_of_birth || null,
                     gender: metadata.gender,

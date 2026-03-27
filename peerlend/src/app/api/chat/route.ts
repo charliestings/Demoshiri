@@ -31,6 +31,7 @@ export async function POST(req: Request) {
             systemInstruction: SYSTEM_PROMPT
         });
 
+
         const formattedHistory = (history || []).map((h: { role: string; content: string }) => ({
             role: h.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: h.content }]
@@ -63,11 +64,21 @@ export async function POST(req: Request) {
         return NextResponse.json({ reply: text });
 
     } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Failed to process chat message";
-        console.error('PeerLend AI Final Error:', message);
+        const errorMessage = error instanceof Error ? error.message : "Failed to process chat message";
+        console.error('PeerLend AI Final Error:', errorMessage);
+
+        // Check for Quota Exceeded (429)
+        if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Rate limit')) {
+            return NextResponse.json({
+                error: 'AI Quota Exceeded',
+                details: "The AI assistant is currently at its free tier limit. Please try again in a few minutes or tomorrow. We apologize for the inconvenience!",
+                retryAfter: 60 // Informational
+            }, { status: 429 });
+        }
+
         return NextResponse.json({
             error: 'Failed to process chat message',
-            details: message
+            details: errorMessage
         }, { status: 500 });
     }
 }

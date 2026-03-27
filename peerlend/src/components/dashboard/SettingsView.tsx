@@ -193,14 +193,14 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
     const handleCheckScore = async () => {
         // 1. Basic Length Check
         if (!formData.pan_number || formData.pan_number.length !== 10) {
-            alert("Please enter a valid 10-digit PAN Number.");
+            showAlert("Invalid PAN", "Please enter a valid 10-digit PAN Number.", "warning");
             return;
         }
 
         // 2. format Check (Regex)
         const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
         if (!panRegex.test(formData.pan_number)) {
-            alert("Invalid PAN Format! It must be 5 letters, 4 numbers, then 1 letter (e.g. ABCDE1234F).");
+            showAlert("Invalid Format", "Invalid PAN Format! It must be 5 letters, 4 numbers, then 1 letter (e.g. ABCDE1234F).", "warning");
             return;
         }
 
@@ -216,14 +216,12 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                 .maybeSingle();
 
             if (existingPan) {
-                alert("This PAN number is already registered with another account. Please use your own identity details.");
+                showAlert("Identity Conflict", "This PAN number is already registered with another account. Please use your own identity details.", "error");
                 setCheckingScore(false);
                 return;
             }
 
-            // Simulate API delay
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
+            // Removed Artificial API delay
             // Mock Logic: Generate score based on PAN hash + Income
             const panSum = formData.pan_number.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
@@ -243,7 +241,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
 
         } catch (e: unknown) {
             console.error("Score check error:", e);
-            alert(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+            showAlert("System Error", `Error: ${e instanceof Error ? e.message : 'Unknown error'}`, "error");
         } finally {
             setCheckingScore(false);
         }
@@ -281,59 +279,61 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
 
             if (dbError) throw dbError;
 
-            alert("Profile image updated successfully!");
+            showAlert("Success", "Profile image updated successfully!", "success");
         } catch (error: unknown) {
             console.error('Error uploading image:', error);
-            alert(`Error uploading image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            showAlert("Upload Error", `Error uploading image: ${error instanceof Error ? error.message : 'Unknown error'}`, "error");
         } finally {
             setLoading(false);
         }
     };
 
     const handleRemoveImage = async () => {
-        if (!confirm("Are you sure you want to remove your profile photo?")) return;
-
-        setLoading(true);
-        try {
-            // 1. Update Profile in DB (set to null)
-            const { error: dbError } = await supabase
-                .from("profiles")
-                .update({
-                    profile_image: null,
-                    updated_at: new Date().toISOString()
-                })
-                .eq("id", user.id);
-
-            if (dbError) throw dbError;
-
-            // 2. Try to clean up Storage if possible
-            // We need to find the file extension or try common ones
-            // Since we know the naming convention is `${user.id}/profile.${ext}`
-            // We'll try to extract the extension from the current URL if it exists
-            const currentUrl = formData.profile_image;
-            if (currentUrl && currentUrl.includes(user.id)) {
+        showAlert(
+            "Remove Photo",
+            "Are you sure you want to remove your profile photo?",
+            "confirm",
+            async () => {
+                setLoading(true);
                 try {
-                    const urlParts = currentUrl.split('?')[0].split('.');
-                    const ext = urlParts[urlParts.length - 1];
-                    const filePath = `${user.id}/profile.${ext}`;
+                    // 1. Update Profile in DB (set to null)
+                    const { error: dbError } = await supabase
+                        .from("profiles")
+                        .update({
+                            profile_image: null,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq("id", user.id);
 
-                    await supabase.storage
-                        .from('avatars')
-                        .remove([filePath]);
-                } catch (storageErr) {
-                    console.warn("Storage cleanup failed (non-critical):", storageErr);
+                    if (dbError) throw dbError;
+
+                    // 2. Try to clean up Storage if possible
+                    const currentUrl = formData.profile_image;
+                    if (currentUrl && currentUrl.includes(user.id)) {
+                        try {
+                            const urlParts = currentUrl.split('?')[0].split('.');
+                            const ext = urlParts[urlParts.length - 1];
+                            const filePath = `${user.id}/profile.${ext}`;
+
+                            await supabase.storage
+                                .from('avatars')
+                                .remove([filePath]);
+                        } catch (storageErr) {
+                            console.warn("Storage cleanup failed (non-critical):", storageErr);
+                        }
+                    }
+
+                    // 3. Update local state
+                    setFormData(prev => ({ ...prev, profile_image: "" }));
+                    showAlert("Photo Removed", "Profile photo removed.", "success");
+                } catch (error: unknown) {
+                    console.error("Error removing photo:", error);
+                    showAlert("Error", `Failed to remove photo: ${error instanceof Error ? error.message : 'Unknown error'}`, "error");
+                } finally {
+                    setLoading(false);
                 }
             }
-
-            // 3. Update local state
-            setFormData(prev => ({ ...prev, profile_image: "" }));
-            alert("Profile photo removed.");
-        } catch (error: unknown) {
-            console.error("Error removing photo:", error);
-            alert(`Failed to remove photo: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        } finally {
-            setLoading(false);
-        }
+        );
     };
     const handleSave = async () => {
         setLoading(true);
@@ -368,28 +368,28 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                 console.error("Update failed:", error);
                 if (error.code === '23505') {
                     if (error.message.includes('pan_number')) {
-                        alert("Identity Error: This PAN number is already linked to another account.");
+                        showAlert("Identity Error", "Identity Error: This PAN number is already linked to another account.", "error");
                     } else if (error.message.includes('aadhar_number')) {
-                        alert("Identity Error: This Aadhar number is already linked to another account.");
+                        showAlert("Identity Error", "Identity Error: This Aadhar number is already linked to another account.", "error");
                     } else if (error.message.includes('phone')) {
-                        alert("This phone number is already in use.");
+                        showAlert("Identity Error", "This phone number is already in use.", "error");
                     } else {
-                        alert("A conflict occurred: One of your unique identifiers is already in use.");
+                        showAlert("Conflict", "A conflict occurred: One of your unique identifiers is already in use.", "error");
                     }
                     setLoading(false);
                     return;
                 }
                 if (error.code === '42501') {
-                    alert("Permission denied! RLS Policy issue.");
+                    showAlert("Permission Denied", "Permission denied! RLS Policy issue.", "error");
                 }
                 throw error;
             }
 
-            alert("Profile updated successfully!");
+            showAlert("Success", "Profile updated successfully!", "success");
         } catch (error: unknown) {
             console.error("Error updating profile:", error);
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
-            alert(`Failed to save: ${errorMessage}`);
+            showAlert("Error", `Failed to save: ${errorMessage}`, "error");
         } finally {
             setLoading(false);
         }
@@ -438,7 +438,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
     const handleSubmitKYC = async () => {
         // Validation
         if (!kycFiles.id_front || !kycFiles.id_back || !kycFiles.pan_card || (!kycFiles.selfie && !capturedSelfie)) {
-            alert("Please upload/capture all 4 documents to submit for verification.");
+            showAlert("Missing Documents", "Please upload/capture all 4 documents to submit for verification.", "warning");
             return;
         }
 
@@ -498,7 +498,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                     .maybeSingle();
 
                 if (duplicateUser) {
-                    alert(`Security Alert: The document you uploaded for ${key.replace('_', ' ')} has already been used by another account. Please upload your own original documents.`);
+                    showAlert("Security Alert", `The document you uploaded for ${key.replace('_', ' ')} has already been used by another account. Please upload your own original documents.`, "error");
                     setKycUploading(false);
                     return;
                 }
@@ -556,83 +556,91 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
             }));
 
             if (onUpdate) onUpdate();
-            alert(`KYC submitted! AI Match Score: ${capturedSelfie?.score ?? (kycFiles.selfie ? 'Manual Verify' : '0')}%`);
+            showAlert("Verification Submitted", `KYC submitted! AI Match Score: ${capturedSelfie?.score ?? (kycFiles.selfie ? 'Manual Verify' : '0')}%`, "success");
         } catch (error: unknown) {
             console.error("KYC submission error:", error);
             const errorMessage = error instanceof Error ? error.message : "Unknown error";
-            alert(`Failed to submit KYC: ${errorMessage}`);
+            showAlert("Submission Failed", `Failed to submit KYC: ${errorMessage}`, "error");
         } finally {
             setKycUploading(false);
         }
     };
 
     const handleResetKYC = async () => {
-        if (confirm("Are you sure you want to reset your KYC? You will need to re-upload all documents. This is useful if you made a mistake or your verification failed.")) {
-            setLoading(true);
-            try {
-                const { error: resetErr } = await supabase
-                    .from("profiles")
-                    .update({
-                        kyc_status: 'none',
-                        kyc_rejection_reason: "",
-                        kyc_match_score: 0,
-                        kyc_liveness_verified: false
-                    })
-                    .eq("id", user.id);
+        showAlert(
+            "Reset KYC",
+            "Are you sure you want to reset your KYC? You will need to re-upload all documents. This is useful if you made a mistake or your verification failed.",
+            "confirm",
+            async () => {
+                setLoading(true);
+                try {
+                    const { error: resetErr } = await supabase
+                        .from("profiles")
+                        .update({
+                            kyc_status: 'not_started',
+                            kyc_rejection_reason: "",
+                            kyc_match_score: 0,
+                            kyc_liveness_verified: false
+                        })
+                        .eq("id", user.id);
 
-                if (resetErr) throw resetErr;
+                    if (resetErr) throw resetErr;
 
-                setFormData(prev => ({
-                    ...prev,
-                    kyc_status: 'none',
-                    kyc_rejection_reason: ""
-                }));
-                setKycFiles({
-                    id_front: null,
-                    id_back: null,
-                    pan_card: null,
-                    selfie: null
-                });
-                setCapturedSelfie(null);
-                setIdCardPreviewUrl(null);
+                    setFormData(prev => ({
+                        ...prev,
+                        kyc_status: 'not_started',
+                        kyc_rejection_reason: ""
+                    }));
+                    setKycFiles({
+                        id_front: null,
+                        id_back: null,
+                        pan_card: null,
+                        selfie: null
+                    });
+                    setCapturedSelfie(null);
+                    setIdCardPreviewUrl(null);
 
-                if (onUpdate) onUpdate();
-                alert("KYC has been reset. You can now re-upload your documents.");
-            } catch (err: unknown) {
-                console.error("KYC reset error:", err);
-                alert(`Failed to reset KYC: ${err instanceof Error ? err.message : 'Unknown error'}`);
-            } finally {
-                setLoading(false);
+                    if (onUpdate) onUpdate();
+                    showAlert("Reset Complete", "KYC has been reset. You can now re-upload your documents.", "success");
+                } catch (err: unknown) {
+                    console.error("KYC reset error:", err);
+                    showAlert("Reset Failed", `Failed to reset KYC: ${err instanceof Error ? err.message : 'Unknown error'}`, "error");
+                } finally {
+                    setLoading(false);
+                }
             }
-        }
+        );
     };
 
     const handleDeleteAccount = async () => {
-        if (!confirm("Are you ABSOLUTELY sure you want to delete your account? This action cannot be undone and will permanently erase all your data.")) {
-            return;
-        }
+        showAlert(
+            "Delete Account",
+            "Are you ABSOLUTELY sure you want to delete your account? This action cannot be undone and will permanently erase all your data.",
+            "confirm",
+            async () => {
+                setLoading(true);
+                try {
+                    // Attempt to delete via Secure RPC
+                    const { error } = await supabase.rpc('delete_user_account');
 
-        setLoading(true);
-        try {
-            // Attempt to delete via Secure RPC
-            const { error } = await supabase.rpc('delete_user_account');
+                    if (error) {
+                        console.error("Deletion failed:", error);
+                        showAlert("Deletion Error", `Cannot delete account: ${error.message}`, "error");
+                        return;
+                    }
 
-            if (error) {
-                console.error("Deletion failed:", error);
-                alert(`Cannot delete account: ${error.message}`);
-                return;
+                    // If we succeed, sign out and redirect
+                    await supabase.auth.signOut();
+                    window.location.href = "/";
+
+                } catch (error: unknown) {
+                    console.error("Fatal deletion error:", error);
+                    showAlert("System Error", "An unexpected error occurred while trying to delete your account.", "error");
+                } finally {
+                    setLoading(false);
+                }
             }
-
-            // If we succeed, sign out and redirect
-            await supabase.auth.signOut();
-            window.location.href = "/";
-
-        } catch (error: unknown) {
-            console.error("Fatal deletion error:", error);
-            alert("An unexpected error occurred while trying to delete your account.");
-        } finally {
-            setLoading(false);
-        }
+        );
     };
 
     if (!user) {
@@ -907,177 +915,7 @@ export function SettingsView({ user, onUpdate }: SettingsViewProps) {
                 </Card>
             </motion.div>
 
-            {/* 4. Identity Verification (KYC) */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
-                <Card className="border-slate-100 shadow-sm overflow-hidden">
-                    <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
-                                <Shield className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-3">
-                                    <CardTitle className="text-lg font-bold text-slate-900">Identity Verification</CardTitle>
-                                    <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${formData.kyc_status === 'approved' ? 'bg-emerald-50 text-emerald-600' :
-                                        formData.kyc_status === 'pending' ? 'bg-orange-50 text-orange-600' :
-                                            formData.kyc_status === 'rejected' ? 'bg-rose-50 text-rose-600' :
-                                                'bg-slate-50 text-slate-400'
-                                        }`}>
-                                        {formData.kyc_status.replace('_', ' ')}
-                                    </span>
-                                </div>
-                                <CardDescription>Verify your identity to increase your limits.</CardDescription>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-8">
-                        {formData.kyc_status === 'approved' ? (
-                            <div className="flex flex-col items-center justify-center py-8 text-center">
-                                <div className="h-20 w-20 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
-                                    <CheckCircle2 className="h-10 w-10 text-emerald-500" />
-                                </div>
-                                <h3 className="text-xl font-black text-slate-900 mb-2">Verification Complete</h3>
-                                <p className="text-slate-500 max-w-sm">Your identity has been successfully verified. You now have full access to all platform features.</p>
-
-                                <Button
-                                    variant="ghost"
-                                    onClick={handleResetKYC}
-                                    className="mt-6 text-slate-400 hover:text-slate-600 font-bold text-[10px] uppercase tracking-widest"
-                                >
-                                    Re-verify (Update Docs)
-                                </Button>
-                            </div>
-                        ) : formData.kyc_status === 'pending' ? (
-                            <div className="flex flex-col items-center justify-center py-8 text-center">
-                                <div className="h-20 w-20 bg-orange-50 rounded-full flex items-center justify-center mb-4 outline-none">
-                                    <Clock className="h-10 w-10 text-orange-500 animate-pulse" />
-                                </div>
-                                <h3 className="text-xl font-black text-slate-900 mb-2">Review in Progress</h3>
-                                <p className="text-slate-500 max-w-sm">We are currently reviewing your documents. This process usually takes 24-48 hours.</p>
-                                <p className="text-[10px] font-bold text-slate-400 mt-4 uppercase tracking-widest">Submitted on {new Date(formData.kyc_submitted_at).toLocaleDateString()}</p>
-
-                                <Button
-                                    variant="ghost"
-                                    onClick={handleResetKYC}
-                                    className="mt-6 text-slate-400 hover:text-slate-600 font-bold text-[10px] uppercase tracking-widest"
-                                >
-                                    Cancel & Re-upload
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="space-y-8">
-                                {formData.kyc_status === 'rejected' && (
-                                    <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-3">
-                                        <AlertCircle className="h-5 w-5 text-rose-500 flex-shrink-0 mt-0.5" />
-                                        <div>
-                                            <p className="text-sm font-black text-rose-900">Verification Rejected</p>
-                                            <p className="text-xs font-medium text-rose-700/80 mt-1">{formData.kyc_rejection_reason}</p>
-                                            <p className="text-[10px] font-bold text-rose-600 mt-2 uppercase">Please re-upload clear documents to try again.</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {[
-                                        { id: 'id_front', label: 'Gov ID Front', desc: 'Aadhaar / Voter ID (Front)' },
-                                        { id: 'id_back', label: 'Gov ID Back', desc: 'Aadhaar / Voter ID (Back)' },
-                                        { id: 'pan_card', label: 'PAN Card', desc: 'Front view of PAN Card' },
-                                        { id: 'selfie', label: 'Selfie Verification', desc: 'Capture live selfie with liveness check' },
-                                    ].map((doc) => (
-                                        <div key={doc.id} className={`space-y-4 ${doc.id === 'selfie' ? 'md:col-span-2' : ''}`}>
-                                            <div className="flex justify-between items-center">
-                                                <div>
-                                                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-900">{doc.label}</Label>
-                                                    <p className="text-[10px] text-slate-400 font-medium">{doc.desc}</p>
-                                                </div>
-                                                {(kycFiles[doc.id] || (doc.id === 'selfie' && capturedSelfie)) && (
-                                                    <span className="text-[10px] font-black text-emerald-600 flex items-center gap-1">
-                                                        <CheckCircle2 className="h-3 w-3" /> Ready
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {doc.id === 'selfie' ? (
-                                                <div className="bg-white rounded-2xl border-2 border-slate-100 p-4 shadow-inner">
-                                                    <KYCCameraCapture
-                                                        onCapture={handleSelfieCapture}
-                                                        idCardImage={idCardPreviewUrl}
-                                                    />
-                                                    {capturedSelfie && (
-                                                        <div className={`mt-4 flex items-center justify-between p-3 rounded-xl border ${capturedSelfie.score > 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
-                                                            <div className="flex items-center gap-2">
-                                                                <Shield className={`h-4 w-4 ${capturedSelfie.score > 0 ? 'text-emerald-600' : 'text-rose-600'}`} />
-                                                                <div className="flex flex-col">
-                                                                    <span className={`text-xs font-bold ${capturedSelfie.score > 0 ? 'text-emerald-900' : 'text-rose-900'}`}>
-                                                                        AI Match Score: {capturedSelfie.score}%
-                                                                    </span>
-                                                                    {capturedSelfie.score === 0 && (
-                                                                        <span className="text-[8px] text-rose-600 font-medium">Face not detected on ID or Selfie. Try a clearer photo.</span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-1">
-                                                                <CheckCircle2 className={`h-3 w-3 ${capturedSelfie.live ? 'text-emerald-600' : 'text-slate-300'}`} />
-                                                                <span className={`text-[10px] font-black uppercase ${capturedSelfie.live ? 'text-emerald-600' : 'text-slate-300'}`}>Live</span>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <div className="relative group">
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        onChange={(e) => handleKYCFileChange(e, doc.id)}
-                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                                    />
-                                                    <div className={`h-32 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-2 ${kycFiles[doc.id]
-                                                        ? 'border-emerald-200 bg-emerald-50/30'
-                                                        : 'border-slate-100 bg-slate-50/50 group-hover:bg-slate-50 group-hover:border-slate-200'
-                                                        }`}>
-                                                        {kycFiles[doc.id] ? (
-                                                            <div className="flex flex-col items-center">
-                                                                <FileUp className="h-6 w-6 text-emerald-500 mb-1" />
-                                                                <p className="text-[10px] font-black text-slate-600 truncate max-w-[120px]">
-                                                                    {kycFiles[doc.id]?.name}
-                                                                </p>
-                                                            </div>
-                                                        ) : (
-                                                            <>
-                                                                <Upload className="h-6 w-6 text-slate-300 group-hover:text-orange-400 transition-colors" />
-                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select Image</p>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <Button
-                                    onClick={handleSubmitKYC}
-                                    disabled={
-                                        kycUploading ||
-                                        !['id_front', 'id_back', 'pan_card'].every(key => kycFiles[key] !== null) ||
-                                        (!kycFiles.selfie && !capturedSelfie)
-                                    }
-                                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl h-14 shadow-lg shadow-orange-500/20 uppercase tracking-widest"
-                                >
-                                    {kycUploading ? (
-                                        <div className="flex items-center gap-2">
-                                            <Clock className="h-4 w-4 animate-spin" />
-                                            Uploading Verification Assets...
-                                        </div>
-                                    ) : (
-                                        "Submit for Verification"
-                                    )}
-                                </Button>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </motion.div>
+            {/* Transaction Security (PIN) moved up since KYC is gone */}
 
             {/* 5. Transaction Security (PIN) */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }}>

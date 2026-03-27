@@ -43,6 +43,11 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} ${inter.variable} ${outfit.variable} ${playfair.variable} antialiased bg-background text-foreground min-h-screen font-inter overflow-x-hidden`}
       >
+        {process.env.NODE_ENV === 'development' && (
+          <script dangerouslySetInnerHTML={{
+            __html: `console.log("%c[PeerLend Diagnostic] Supabase URL: " + (process.env.NEXT_PUBLIC_SUPABASE_URL || "MISSING"), "color: #f97316; font-weight: bold;")`
+          }} />
+        )}
         {children}
         <ChatBot />
       </body>

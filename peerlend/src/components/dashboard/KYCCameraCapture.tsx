@@ -4,7 +4,8 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import * as faceapi from 'face-api.js';
 import { Button } from '@/components/ui/button';
-import { Camera, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Camera, RefreshCw, CheckCircle2, AlertCircle, Loader2, Shield } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface KYCCameraCaptureProps {
     onCapture: (imageSrc: string, matchScore: number, livenessVerified: boolean, notes?: string) => void;
@@ -36,9 +37,11 @@ export const KYCCameraCapture: React.FC<KYCCameraCaptureProps> = ({ onCapture, i
                 setIsModelLoaded(true);
                 setStatus("Ready to verify!");
             } catch (err) {
-                console.error("Failed to load face-api models:", err);
-                setError("Failed to load AI models. Please check your connection.");
+                console.error("AI Model Loading Error (FaceAPI):", err);
+                const errorMessage = err instanceof Error ? err.message : "Network failure (Failed to fetch)";
+                setError(`Failed to load AI models: ${errorMessage}. This usually happens if the external model URL is blocked by your firewall, or if you are offline. Contact support if this persists.`);
             }
+
         };
         loadModels();
     }, []);
@@ -71,13 +74,23 @@ export const KYCCameraCapture: React.FC<KYCCameraCaptureProps> = ({ onCapture, i
         try {
             // 1. Load and detect selfie
             const selfieImg = await loadImage(imageSrc);
-            const selfieResult = await faceapi.detectSingleFace(selfieImg, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+            
+            // Pass 1: Tiny Face Detector (Faster)
+            let selfieResult = await faceapi.detectSingleFace(selfieImg, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
                 .withFaceLandmarks()
                 .withFaceDescriptor();
 
+            // Pass 2: SSD Mobilenet (More Accurate Fallback)
+            if (!selfieResult) {
+                setStatus("Retrying detection...");
+                selfieResult = await faceapi.detectSingleFace(selfieImg, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+            }
+
             if (!selfieResult) {
                 console.error("KYC: Could not detect face in selfie");
-                setError("Face not found in selfie. Please ensure good lighting.");
+                setError("Face not found in selfie. Please look directly at the camera and ensure your face is well-lit.");
                 setCapturedImage(null);
                 setLivenessStep(0);
                 return;
@@ -183,25 +196,17 @@ export const KYCCameraCapture: React.FC<KYCCameraCaptureProps> = ({ onCapture, i
             isAnalyzing.current = false;
         }
     }, [isModelLoaded, isStarted, livenessStep, capturedImage, captureAndVerify]);
-
-    // Optimized Detection Loop
+ 
+    // 4. Background loop for liveness detection
     useEffect(() => {
-        let timeout: NodeJS.Timeout;
-        const loop = async () => {
-            if (isModelLoaded && isStarted && !capturedImage && livenessStep < 2) {
-                await handleLivenessCheck();
-                timeout = setTimeout(loop, 800);
-            }
-        };
+        if (!isStarted || !isModelLoaded || capturedImage || livenessStep >= 2) return;
 
-        if (isModelLoaded && isStarted && !capturedImage && livenessStep < 2) {
-            loop();
-        }
+        const interval = setInterval(() => {
+            handleLivenessCheck();
+        }, 500); // 500ms for balance between performance and detection speed
 
-        return () => {
-            if (timeout) clearTimeout(timeout);
-        };
-    }, [isModelLoaded, isStarted, capturedImage, livenessStep, handleLivenessCheck]);
+        return () => clearInterval(interval);
+    }, [isStarted, isModelLoaded, capturedImage, livenessStep, handleLivenessCheck]);
 
     const reset = () => {
         setCapturedImage(null);
@@ -244,6 +249,20 @@ export const KYCCameraCapture: React.FC<KYCCameraCaptureProps> = ({ onCapture, i
                             screenshotFormat="image/jpeg"
                             className="w-full h-full object-cover mirror"
                             videoConstraints={{ facingMode: "user" }}
+                            onUserMedia={() => setStatus("Camera active! Show your face.")}
+                            onUserMediaError={(err) => {
+                                console.error("Webcam Error:", err);
+                                const errName = typeof err === 'string' ? err : err.name;
+                                const errMsg = typeof err === 'string' ? err : err.message;
+                                
+                                if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+                                    setError("Camera access denied. Please click the 'Lock' icon in your browser address bar and set Camera to 'Allow', then refresh.");
+                                } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
+                                    setError("No camera found on this device. Please connect a webcam.");
+                                } else {
+                                    setError(`Camera failed: ${errMsg || "Unknown error"}. Try closing other apps using the camera.`);
+                                }
+                            }}
                         />
                         <div className="absolute inset-0 border-4 border-dashed border-white/20 pointer-events-none flex items-center justify-center">
                             <div className="w-48 h-64 border-2 border-white/40 rounded-[3rem]" />
@@ -254,34 +273,79 @@ export const KYCCameraCapture: React.FC<KYCCameraCaptureProps> = ({ onCapture, i
                 )}
 
                 {isStarted && (
-                    <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-md p-3 rounded-xl flex items-center gap-3 border border-white/10">
-                        {error ? (
-                            <AlertCircle className="h-5 w-5 text-rose-400" />
-                        ) : livenessStep === 2 ? (
-                            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                        ) : (
-                            <Loader2 className="h-5 w-5 text-orange-500 animate-spin" />
-                        )}
-                        <div className="flex flex-col">
-                            <p className={`text-[10px] font-black uppercase tracking-widest ${error ? 'text-rose-100' : 'text-white'}`}>
-                                {error || status}
-                            </p>
-                            {!error && status === "Verification logic complete!" && (
-                                <p className="text-[8px] text-emerald-400 font-bold uppercase mt-0.5">Click 'Save Profile' below to finish</p>
+                    <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-3 pointer-events-none">
+                        <div className="bg-slate-900/90 backdrop-blur-md p-3 rounded-xl flex items-center gap-3 border border-white/10 shadow-xl pointer-events-auto">
+                            {error ? (
+                                <AlertCircle className="h-5 w-5 text-rose-400" />
+                            ) : livenessStep === 2 || status === "Verification logic complete!" ? (
+                                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                            ) : (
+                                <Loader2 className="h-5 w-5 text-orange-500 animate-spin" />
                             )}
+                            <div className="flex flex-col">
+                                <p className={`text-[10px] font-black uppercase tracking-widest ${error ? 'text-rose-100' : 'text-white'}`}>
+                                    {error || (isVerifying ? "AI Processing... Please wait" : status)}
+                                </p>
+                                {!error && status === "Verification logic complete!" && (
+                                    <p className="text-[8px] text-emerald-400 font-bold uppercase mt-0.5">Click 'Save Profile' below to finish</p>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
+
+                {/* Prominent Verification Overlay */}
+                <AnimatePresence>
+                    {isVerifying && (
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-center p-6"
+                        >
+                            <div className="relative mb-6">
+                                <div className="h-20 w-20 rounded-full border-4 border-orange-500/20 border-t-orange-500 animate-spin" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <Shield className="h-8 w-8 text-orange-500 animate-pulse" />
+                                </div>
+                            </div>
+                            <h3 className="text-white font-black uppercase tracking-[0.2em] text-sm mb-2">Analyzing Identity...</h3>
+                            <p className="text-slate-400 text-[10px] font-bold uppercase leading-relaxed max-w-[200px]">
+                                Please wait until the live verification is done. This helps keep PeerLend secure.
+                            </p>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3">
+                {isStarted && !capturedImage && (
+                    <Button
+                        onClick={captureAndVerify}
+                        disabled={isVerifying}
+                        className="w-full bg-orange-600 hover:bg-orange-700 text-white rounded-2xl py-8 font-black uppercase tracking-widest text-[12px] shadow-xl shadow-orange-500/20 border-b-4 border-orange-800 active:border-b-0 active:translate-y-[2px] transition-all"
+                    >
+                        {isVerifying ? (
+                            <>
+                                <Loader2 className="h-5 w-5 mr-3 animate-spin" />
+                                Processing Selfie...
+                            </>
+                        ) : (
+                            <>
+                                <Camera className="h-5 w-5 mr-3" />
+                                Capture Selfie Now
+                            </>
+                        )}
+                    </Button>
+                )}
+
                 {capturedImage && (
                     <Button
                         variant="ghost"
                         onClick={reset}
-                        className="flex-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl text-[10px] uppercase font-black"
+                        className="w-full text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl py-4 text-[10px] uppercase font-black border border-white/5"
                     >
-                        <RefreshCw className="h-3 w-3 mr-2" /> Redo Capture
+                        <RefreshCw className="h-4 w-4 mr-2" /> Redo Capture
                     </Button>
                 )}
             </div>

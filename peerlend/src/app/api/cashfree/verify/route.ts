@@ -102,7 +102,8 @@ export async function POST(req: Request) {
 
             // 2. Execute the deposit using the user's authenticated context so auth.uid() works
             const { error: depositError } = await supabaseClient.rpc('deposit_funds', {
-                amount_to_add: amount
+                amount_to_add: amount,
+                p_order_id: order_id
             });
 
             if (depositError) {

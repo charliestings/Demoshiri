@@ -42,8 +42,7 @@ export function TransactionsView({ userId }: TransactionsViewProps) {
 
             if (error) throw error;
             setTransactions(data || []);
-            // Add Artificial Delay so user can see Skeletons!
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Removed Artificial Delay
 
         } catch (error: unknown) {
             console.error("Error fetching transactions:", error);

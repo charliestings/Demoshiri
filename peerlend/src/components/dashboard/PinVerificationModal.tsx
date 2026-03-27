@@ -99,7 +99,7 @@ export function PinVerificationModal({
                 setTimeout(() => {
                     onSuccess();
                     onClose();
-                }, 800);
+                }, 100);
             } else {
                 setError(data?.error || "Incorrect PIN. Please try again.");
                 setPin(new Array(6).fill(""));

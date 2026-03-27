@@ -42,19 +42,24 @@ export default function LoginPage() {
             return;
         }
 
-        const { error: authError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        try {
+            const { error: authError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
 
-        if (authError) {
-            setError(authError.message);
+            if (authError) {
+                setError(authError.message);
+                return;
+            }
+
+            // Successful login -> Redirect
+            router.push("/dashboard");
+        } catch (err: any) {
+            setError(err.message || "An unexpected error occurred during sign in.");
+        } finally {
             setLoading(false);
-            return;
         }
-
-        router.push("/dashboard");
-        router.refresh();
     };
 
     return (
@@ -109,7 +114,7 @@ export default function LoginPage() {
                 </div>
 
                 <Button
-                    className="w-full h-14 bg-gradient-to-r from-orange-500 to-rose-600 hover:from-orange-600 hover:to-rose-700 text-white shadow-xl shadow-rose-500/20 rounded-2xl font-black uppercase tracking-widest text-sm transition-all hover:scale-[1.02] active:scale-95"
+                    className="w-full h-14 bg-gradient-to-r from-orange-500 to-rose-600 hover:from-orange-600 hover:to-rose-700 text-white shadow-xl shadow-rose-500/20 rounded-2xl font-black uppercase tracking-widest text-sm transition-all"
                     type="submit"
                     disabled={loading}
                 >

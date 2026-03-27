@@ -12,8 +12,10 @@ import { NotificationsView } from "@/components/dashboard/NotificationsView";
 import { LenderView } from "@/components/dashboard/LenderView";
 import { WalletView } from "@/components/dashboard/WalletView";
 import { TransactionsView } from "@/components/dashboard/TransactionsView";
+import { KYCView } from "@/components/dashboard/KYCView";
 import { TransactionSuccessModal } from "@/components/dashboard/TransactionSuccessModal";
 import { PinVerificationModal } from "@/components/dashboard/PinVerificationModal";
+import { AlertModal, AlertType } from "@/components/dashboard/AlertModal";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -24,11 +26,13 @@ import {
     CheckCircle2,
     TrendingUp,
     Zap,
-    Info
+    Info,
+    Menu
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatINR } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 
 interface Profile {
     id: string;
@@ -84,6 +88,8 @@ function DashboardContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "overview");
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
     const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
     const [role, setRole] = useState<"borrower" | "lender">("borrower");
     const [isAdmin, setIsAdmin] = useState(false);
@@ -105,6 +111,18 @@ function DashboardContent() {
     const [pinPurpose, setPinPurpose] = useState<"investment" | "repayment">("investment");
     const [pinAction, setPinAction] = useState<() => Promise<void>>(() => async () => { });
     const [, setLoanToRepay] = useState<Loan | null>(null);
+
+    const [alertConfig, setAlertConfig] = useState({
+        open: false,
+        title: "",
+        message: "",
+        type: "info" as AlertType,
+        onConfirm: undefined as (() => void) | undefined
+    });
+
+    const showAlert = (title: string, message: string, type: AlertType = "info", onConfirm?: () => void) => {
+        setAlertConfig({ open: true, title, message, type, onConfirm });
+    };
 
     const fetchNotificationsCount = useCallback(async () => {
         if (!user) return;
@@ -235,7 +253,7 @@ function DashboardContent() {
                         ? 'Congratulations! Your identity verification is complete. You now have full platform access.'
                         : `Your identity verification was rejected. Reason: ${reason}. Please re-submit clear documents.`,
                     type: "kyc_status_change",
-                    link: "/dashboard?tab=settings"
+                    link: "/dashboard?tab=kyc"
                 });
             } catch (notifyError) {
                 console.error("Error creating KYC notification:", notifyError);
@@ -245,56 +263,83 @@ function DashboardContent() {
     };
 
     useEffect(() => {
+        let mounted = true;
+
         const checkUser = async () => {
             const { data: { session } } = await supabase.auth.getSession();
+            if (!mounted) return;
+
             if (!session) {
-                router.push("/login?redirect=dashboard");
-                return;
+                // If no session found, give it a tiny moment to check if it's just a routing sync issue
+                const { data: { session: secondCheck } } = await supabase.auth.getSession();
+                if (!secondCheck && mounted) {
+                    router.push("/login?redirect=dashboard");
+                    return;
+                }
+                if (!mounted) return;
+                setUser(secondCheck?.user || null);
+            } else {
+                setUser(session.user);
             }
-            setUser(session.user);
+
+            const currentUser = session?.user || (await supabase.auth.getSession()).data.session?.user;
+            if (!currentUser) return;
 
             // Fetch profile to get role and admin status
             let { data: profile } = await supabase
                 .from("profiles")
                 .select("id, full_name, is_admin, kyc_status")
-                .eq("id", session.user.id)
+                .eq("id", currentUser.id)
                 .single();
 
             // If profile doesn't exist, create a default one
-            if (!profile) {
+            if (!profile && mounted) {
                 const { data: newProfile, error: createError } = await supabase
                     .from("profiles")
                     .insert({
-                        id: session.user.id,
-                        is_admin: session.user.email?.includes('admin'),
-                        full_name: session.user.email?.split('@')[0] || 'User'
+                        id: currentUser.id,
+                        email: currentUser.email,
+                        is_admin: currentUser.email?.includes('admin'),
+                        full_name: currentUser.email?.split('@')[0] || 'User'
                     })
                     .select()
                     .single();
 
                 if (!createError && newProfile) {
                     profile = newProfile;
-                } else if (createError) {
-                    console.error("Error creating profile:", createError);
                 }
             }
 
-            if (profile) {
-                // Since 'role' doesn't exist in the DB, we default to borrower or infer from is_admin
+            if (profile && mounted) {
                 setRole("borrower");
                 setIsAdmin(profile.is_admin || false);
                 setKycStatus(profile.kyc_status || "none");
             }
 
-            setLoading(false);
+            if (mounted) setLoading(false);
         };
+
         checkUser();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session && mounted) {
+                setUser(session.user);
+                checkUser();
+            } else if (event === 'SIGNED_OUT' && mounted) {
+                router.push("/login");
+            }
+        });
+
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
     }, [router]);
 
     // Handle tab switching via URL search params
     useEffect(() => {
         const tab = searchParams.get("tab");
-        if (tab && ["overview", "market", "loans", "transactions", "admin", "settings", "notifications", "wallet"].includes(tab)) {
+        if (tab && ["overview", "market", "loans", "transactions", "admin", "settings", "notifications", "wallet", "kyc"].includes(tab)) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setActiveTab(tab);
         }
@@ -319,8 +364,9 @@ function DashboardContent() {
         )
     }
 
+
     return (
-        <div className="flex min-h-screen bg-[#fffcfc] selection:bg-rose-100 selection:text-rose-900">
+        <div className="flex h-screen bg-[#fffcfc] overflow-hidden">
             {/* Sidebar */}
             <Sidebar
                 activeTab={activeTab}
@@ -329,20 +375,44 @@ function DashboardContent() {
                 isAdmin={isAdmin}
                 userEmail={user?.email}
                 unreadNotifications={unreadNotifications}
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                isExpanded={isSidebarExpanded}
+                onToggleExpand={() => setIsSidebarExpanded(!isSidebarExpanded)}
             />
 
             {/* Main Content */}
-            <main className="flex-1 ml-64 p-8 overflow-hidden h-screen relative bg-[#fffcfc]">
+            <motion.main 
+                animate={{ 
+                    marginLeft: isSidebarExpanded ? (typeof window !== 'undefined' && window.innerWidth < 1024 ? 0 : 256) : (typeof window !== 'undefined' && window.innerWidth < 1024 ? 0 : 80)
+                }}
+                transition={{ type: "tween", ease: "circOut", duration: 0.25 }}
+                className={cn(
+                    "flex-1 p-8 overflow-hidden h-screen relative bg-[#fffcfc]",
+                    isSidebarOpen ? "ml-0" : "ml-0"
+                )}
+            >
                 {/* Floating Sunset Blobs - Matches Homepage */}
                 <div className="absolute top-[-5%] right-[-5%] w-[600px] h-[600px] bg-orange-200/20 rounded-full blur-[120px] -z-10 animate-pulse" />
                 <div className="absolute bottom-[-5%] left-[-5%] w-[500px] h-[500px] bg-rose-200/30 rounded-full blur-[100px] -z-10" />
 
                 <header className="flex justify-between items-center mb-6 relative z-10">
-                    <div>
-                        <h1 className="text-4xl font-black tracking-tight neon-text uppercase leading-none">
-                            {activeTab === "market" ? "Explore Loans" : activeTab.replace("-", " ")}
-                        </h1>
-                        <p className="text-slate-500 font-medium mt-1">Hello, <span className="text-rose-600 font-bold capitalize">{user?.email?.split('@')[0] || 'User'}</span>. Managing your {role} portfolio.</p>
+                    <div className="flex items-center gap-4">
+                        {/* Mobile Hamburger Button */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setIsSidebarOpen(true)}
+                            className="lg:hidden text-slate-600 hover:bg-slate-100 rounded-xl"
+                        >
+                            <Menu className="h-6 w-6" />
+                        </Button>
+                        <div>
+                            <h1 className="text-4xl font-black tracking-tight neon-text uppercase leading-none">
+                                {activeTab === "market" ? "Explore Loans" : activeTab.replace("-", " ")}
+                            </h1>
+                            <p className="text-slate-500 font-medium mt-1">Hello, <span className="text-rose-600 font-bold capitalize">{user?.email?.split('@')[0] || 'User'}</span>. Managing your {role} portfolio.</p>
+                        </div>
                     </div>
                     {/* Global actions */}
                     <div className="flex items-center gap-4">
@@ -371,7 +441,7 @@ function DashboardContent() {
                             </div>
                         </div>
                         <Button
-                            onClick={() => setActiveTab("settings")}
+                            onClick={() => setActiveTab("kyc")}
                             variant="ghost"
                             className="text-[10px] font-black uppercase tracking-widest text-orange-600 hover:bg-orange-100 rounded-xl px-4"
                         >
@@ -434,8 +504,7 @@ function DashboardContent() {
                                                             setShowRepaySuccess(true);
                                                             fetchData();
                                                         } catch (err: unknown) {
-                                                            console.error("Repayment error:", err);
-                                                            alert("Repayment failed: " + (err instanceof Error ? err.message : "Unknown error"));
+                                                            showAlert("System Error", "Repayment failed: " + (err instanceof Error ? err.message : "Unknown error"), "error");
                                                         }
                                                     });
                                                     setIsPinModalOpen(true);
@@ -459,20 +528,30 @@ function DashboardContent() {
                                                     setPinPurpose("investment");
                                                     setPinAction(() => async () => {
                                                         try {
-                                                            const { data, error: investError } = await supabase.rpc('process_loan_investment', {
-                                                                investor_uid: user.id,
-                                                                target_loan_id: loan.id,
-                                                                invest_amount: amount
-                                                            });
-                                                            if (investError) throw new Error(investError.message || 'Investment failed');
-                                                            setShowInvestSuccess(true);
-                                                            setLastInvestAmount(amount);
-                                                            setLastInvestPurpose(loan.purpose);
-                                                            fetchData();
-                                                        } catch (err: unknown) {
-                                                            console.error("Investment error:", err);
-                                                            alert("Investment failed: " + (err instanceof Error ? err.message : "Unknown error"));
-                                                        }
+                                                                const { data, error: investError } = await supabase.rpc('process_loan_investment', {
+                                                                    investor_uid: user.id,
+                                                                    target_loan_id: loan.id,
+                                                                    invest_amount: amount
+                                                                });
+
+                                                                if (investError) {
+                                                                    console.error("Investment RPC Error:", investError);
+                                                                    throw new Error(investError.message || 'Investment failed');
+                                                                }
+
+                                                                if (data && data.success === false) {
+                                                                    showAlert("Investment Failed", data.error || "Failed to process investment", "error");
+                                                                    return;
+                                                                }
+
+                                                                setShowInvestSuccess(true);
+                                                                setLastInvestAmount(amount);
+                                                                setLastInvestPurpose(loan.purpose);
+                                                                fetchData();
+                                                            } catch (err: unknown) {
+                                                                console.error("Investment error:", err);
+                                                                showAlert("System Error", "Investment failed: " + (err instanceof Error ? err.message : "Unknown error"), "error");
+                                                            }
                                                     });
                                                     setIsPinModalOpen(true);
                                                 }}
@@ -502,18 +581,28 @@ function DashboardContent() {
                                             if (!loan) return;
                                             const repaymentAmount = loan.amount + (loan.amount * (loan.interest_rate / 100));
                                             try {
-                                                const { error: repayError } = await supabase.rpc('process_loan_repayment', {
+                                                const { data, error: repayError } = await supabase.rpc('process_loan_repayment', {
                                                     borrower_uid: user.id,
                                                     target_loan_id: loan.id
                                                 });
-                                                if (repayError) throw new Error(repayError.message || 'Repayment failed');
+
+                                                if (repayError) {
+                                                    console.error("Repayment RPC Error:", repayError);
+                                                    throw new Error(repayError.message || 'Repayment failed');
+                                                }
+
+                                                if (data && data.success === false) {
+                                                    showAlert("Repayment Failed", data.error || "Failed to process repayment", "error");
+                                                    return;
+                                                }
+
                                                 setShowRepaySuccess(true);
                                                 setLastRepayAmount(repaymentAmount);
                                                 setLastRepayPurpose(loan.purpose);
                                                 fetchData();
                                             } catch (err: unknown) {
                                                 console.error("Repayment error:", err);
-                                                alert("Repayment failed: " + (err instanceof Error ? err.message : "Unknown error"));
+                                                showAlert("System Error", "Repayment failed: " + (err instanceof Error ? err.message : "Unknown error"), "error");
                                             }
                                         });
                                         setIsPinModalOpen(true);
@@ -546,7 +635,17 @@ function DashboardContent() {
                                                     target_loan_id: loan.id,
                                                     invest_amount: amount
                                                 });
-                                                if (investError) throw investError;
+
+                                                if (investError) {
+                                                    console.error("Investment RPC Error:", investError);
+                                                    throw new Error(investError.message || 'Investment failed');
+                                                }
+
+                                                if (data && data.success === false) {
+                                                    showAlert("Investment Failed", data.error || "Failed to process investment", "error");
+                                                    return;
+                                                }
+
                                                 setShowInvestSuccess(true);
                                                 setLastInvestAmount(amount);
                                                 setLastInvestPurpose(loan.purpose);
@@ -554,7 +653,7 @@ function DashboardContent() {
                                             } catch (err: unknown) {
                                                 console.error("Investment error:", err);
                                                 const errorMessage = err instanceof Error ? err.message : "Unknown error";
-                                                alert("Investment failed: " + errorMessage);
+                                                showAlert("System Error", "Investment failed: " + errorMessage, "error");
                                             }
                                         });
                                         setIsPinModalOpen(true);
@@ -569,6 +668,10 @@ function DashboardContent() {
                                     onUpdate={handleLoanStatusUpdate}
                                     onKYCUpdate={handleKYCUpdate}
                                 />
+                            )}
+
+                            {activeTab === "kyc" && user && (
+                                <KYCView user={user} onUpdate={fetchData} />
                             )}
 
                             {activeTab === "settings" && (
@@ -586,7 +689,7 @@ function DashboardContent() {
                         </motion.div>
                     </AnimatePresence>
                 </div>
-            </main>
+            </motion.main>
 
             <TransactionSuccessModal
                 isOpen={showRepaySuccess}
@@ -616,6 +719,15 @@ function DashboardContent() {
                 title={pinPurpose === "investment" ? "Authorize Investment" : "Authorize Repayment"}
                 description={`Enter your 6-digit transaction PIN to confirm this ${pinPurpose}.`}
                 actionLabel={pinPurpose === "investment" ? "Confirm Investment" : "Confirm Repayment"}
+            />
+            
+            <AlertModal
+                isOpen={alertConfig.open}
+                onClose={() => setAlertConfig(prev => ({ ...prev, open: false }))}
+                onConfirm={alertConfig.onConfirm}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
             />
         </div>
     );
